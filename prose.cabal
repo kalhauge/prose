@@ -1,0 +1,86 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.3.
+--
+-- see: https://github.com/sol/hpack
+
+name:           prose
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/kalhauge/prose#readme>
+homepage:       https://github.com/kalhauge/prose#readme
+bug-reports:    https://github.com/kalhauge/prose/issues
+author:         Christian Gram Kalhauge
+maintainer:     christian@kalhauge.dk
+copyright:      BSD-3
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    LICENSE
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/kalhauge/prose
+
+library
+  exposed-modules:
+      Prose.Doc
+      Prose.Text.Markdown
+  other-modules:
+      Paths_prose
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      base >=4.7 && <5
+    , megaparsec >=9.0 && <10
+    , prettyprinter >=1.2
+    , text >=1.2
+  default-language: Haskell2010
+
+executable prose-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_prose
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , megaparsec >=9.0 && <10
+    , prettyprinter >=1.2
+    , prose
+    , text >=1.2
+  default-language: Haskell2010
+
+test-suite prose-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Prose.Text.MarkdownSpec
+      Spec
+      SpecHelper
+      Paths_prose
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Glob
+    , base
+    , doctest
+    , hedgehog
+    , hlint
+    , hspec
+    , hspec-discover >=2.7
+    , hspec-expectations-pretty-diff
+    , hspec-hedgehog
+    , megaparsec >=9.0 && <10
+    , prettyprinter >=1.2
+    , prose
+    , tasty
+    , tasty-hspec
+    , tasty-rerun
+    , text >=1.2
+  default-language: Haskell2010
