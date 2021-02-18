@@ -6,16 +6,14 @@ import Prelude hiding (Word)
 -- text 
 import qualified Data.Text as Text
 
-
 type Doc = SimpleSection
 
-
 newtype SimpleSection = SimpleSection 
-  { getSection :: Section SimpleSection SimpleBlock Sentence }
+  { getSection :: Section SimpleSection SimpleBlock Inline }
   deriving (Eq)
 
 newtype SimpleBlock = SimpleBlock
-  { getBlock :: Block SimpleBlock Sentence }
+  { getBlock :: Block SimpleBlock Inline }
   deriving (Eq)
 
 instance Show SimpleSection where
@@ -30,26 +28,27 @@ instance Show SimpleBlock where
 
 -- | A Section
 data Section s b i = Section
-  { sectionTitle :: [i]
+  { sectionTitle :: [Sentence i]
   , sectionContent :: [b]
   , sectionSubs :: [s]
   } deriving (Show, Eq)
 
 -- | A Block
-newtype Block b s 
-  = Para [s]
+newtype Block b i
+  = Para [Sentence i]
   deriving (Eq, Show)
 
 data Inline 
   = Word Text.Text
   | Comma
   | Colon
+  | SemiColon
   | Hyphen
   deriving (Eq, Show)
 
-data Sentence = Sentence
-  { sentenceEnd :: [End]
-  , sentenceContent :: [Inline]
+data Sentence i = Sentence
+  { sentenceContent :: [i]
+  , sentenceEnd :: [End]
   }
   deriving (Eq, Show)
 
