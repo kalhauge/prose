@@ -149,7 +149,8 @@ sQoutedSentences :: Serializer s b i (QoutedSentences i)
 sQoutedSentences (QoutedSentences qoute sentences) = case qoute of
   SingleQoute -> "'" <> sSentences sentences <> "'"
   DoubleQoute -> "\"" <> sSentences sentences <> "\""
-  Italic -> "/" <> sSentences sentences <> "/"
+  Parenthesis -> "(" <> sSentences sentences <> ")"
+  Emph -> "/" <> sSentences sentences <> "/"
   Strong -> "*" <> sSentences sentences <> "*"
 
 
@@ -185,8 +186,9 @@ pQoutedSentences = do
   case qoute of 
     SingleQoute -> void $ label "end of qoute (')" (char '\'')
     DoubleQoute -> void $ label "end of qoute (\")" (char '\"')
-    Italic -> void . label "end of italic (/)" $ char '/'
-    Strong -> void . label "end of bold (*)" $ char '*'
+    Emph -> void . label "end of emph (/)" $ char '/'
+    Strong -> void . label "end of strong (*)" $ char '*'
+    Parenthesis -> void . label "end of paranthesis ())" $ char ')'
 
   return $ QoutedSentences qoute sens
 
@@ -197,7 +199,8 @@ pQoutedSentences = do
       [ char '\'' $> SingleQoute
       , char '"' $> DoubleQoute
       , string "*" $> Strong
-      , char '/' $> Italic
+      , char '/' $> Emph
+      , char '(' $> Parenthesis
       ] <* notFollowedBy (endQoute <|> void pEnd)
 
     if x `elem` qoutes
@@ -207,8 +210,6 @@ pQoutedSentences = do
   -- qouteSymbol = void $ oneOf ['\'', '"', '*']
   endQoute = void do 
     many (oneOf ['\'', '"', '*', '/']) <* (space1 <|> eof)
-
-
 
 -- Blocks
 

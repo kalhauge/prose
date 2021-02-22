@@ -75,7 +75,8 @@ data QoutedSentences i = QoutedSentences
 data Qoute 
   = SingleQoute
   | DoubleQoute
-  | Italic
+  | Parenthesis
+  | Emph
   | Strong
   deriving (Eq, Show, Enum, Bounded)
 
