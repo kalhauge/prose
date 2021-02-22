@@ -47,6 +47,20 @@ data Section s b i = Section
 newtype Block b i
   = Para (Sentences i)
   deriving (Eq, Show)
+  -- Items (NE.NonEmpty (Item b))
+
+-- data Item b = Item 
+--   { itemType :: ItemType
+--   , itemTodo :: Maybe Bool
+--   , itemContents :: NE.NonEmpty b
+--   } 
+--   deriving (Eq, Show)
+-- 
+-- data ItemType 
+--   = Minus
+--   | Plus
+--   | Times
+--   deriving (Eq, Show)
 
 data Sentences i = Sentences 
   { closed :: [Sentence i]

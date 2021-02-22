@@ -2,6 +2,7 @@ module SpecHelper
   ( it
   , describe
   , Spec, SpecWith, runIO
+  , focus
   , module Test.Hspec.Hedgehog
   , module Test.Hspec.Expectations.Pretty
   , prop

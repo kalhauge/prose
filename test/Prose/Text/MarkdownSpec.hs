@@ -10,11 +10,11 @@ import Data.Functor.Identity
 import Control.Monad.Reader
 
 -- Glob
--- import System.FilePath.Glob (glob)
+import System.FilePath.Glob (glob)
 
 -- text
 import qualified Data.Text as Text
--- import qualified Data.Text.IO as Text
+import qualified Data.Text.IO as Text
 
 -- megaparsec
 import Text.Megaparsec hiding (parse)
@@ -33,12 +33,10 @@ import SpecHelper
 spec :: Spec
 spec = do
   specInline
-  
+  specSectionText
+  specAllDataFiles
   --specSentences
   --specBlock
-
-  -- specAllDataFiles
-
 
 specInline :: Spec 
 specInline = describe "inline" do
@@ -58,19 +56,44 @@ specInline = describe "inline" do
   sSimpleInline = sInline . getInline
 
 
--- specAllDataFiles :: Spec
--- specAllDataFiles = runIO (glob "test/data/*.md") >>= mapM_ \f -> describe f do 
---  txt <- runIO (Text.readFile f)
--- 
---  it "can parse - serialize - parse" do
---    case runParser pDoc f txt of
---      Left err -> expectationFailure (errorBundlePretty err)
---      Right d1 -> do
---        let txt2 = serialize (sDoc d1)
---        case runParser pDoc "serialized" txt2 of
---          Left err -> expectationFailure (errorBundlePretty err)
---          Right d2 -> 
---            d2 `shouldBe` d1
+specSectionText :: Spec
+specSectionText = describe "section text" do 
+  onFile "test/data/good/simple.prs" \txt -> do
+    it "should contain 2 headers" do
+      parse pSectionText txt \a -> do
+        a `shouldSatisfy` (== 2) . length
+
+  onGoodFiles \txt -> do 
+    it "should parse" do
+      parse pSectionText txt \a -> do
+        a `shouldSatisfy` (>= 0) . length
+
+specAllDataFiles :: Spec
+specAllDataFiles = describe "on **/*.prs" do
+ onGoodFiles \txt -> do
+   it "can parse - serialize - parse" do
+     parseOrFail pDoc txt \d -> do
+       parseOrFail pDoc (serialize (sDoc d simpleSerializeConfig)) 
+        (`shouldBe` d)
+ onCanonicalFiles \txt -> do
+   it "can parse - serialize" do
+     parseOrFail pDoc txt \d -> do
+       serialize (sDoc d simpleSerializeConfig) `shouldBe` txt
+
+onGoodFiles :: (Text.Text -> SpecWith ()) -> SpecWith ()
+onGoodFiles k = do
+  files <- runIO (glob "test/data/good/*.prs")
+  forM_ files (`onFile` k)
+
+onCanonicalFiles :: (Text.Text -> SpecWith ()) -> SpecWith ()
+onCanonicalFiles k = do
+  files <- runIO (glob "test/data/canonical/*.prs")
+  forM_ files (`onFile` k)
+
+onFile :: FilePath -> (Text.Text -> SpecWith ()) -> SpecWith ()
+onFile file k = describe file do 
+  k =<< runIO (Text.readFile file)
+
 
 
 -- specSentences :: Spec 
@@ -134,6 +157,11 @@ examples p s str item = do
 parse :: MonadFail m => SimpleParser i -> Text.Text -> (i -> m ()) -> m ()
 parse p txt run = case runReader (runParserT (p <* eof) "" txt) simplePaserConfig of 
   Left err -> fail (errorBundlePretty err)
+  Right d -> run d
+
+parseOrFail :: SimpleParser i -> Text.Text -> (i -> IO ()) -> IO ()
+parseOrFail p txt run = case runReader (runParserT (p <* eof) "" txt) simplePaserConfig of 
+  Left err -> expectationFailure (errorBundlePretty err)
   Right d -> run d
 
 -- 
