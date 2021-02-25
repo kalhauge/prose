@@ -44,10 +44,11 @@ data Section s b i = Section
   } deriving (Show, Eq)
 
 -- | A Block
-newtype Block b i
+data Block b i
   = Para (Sentences i)
+  | Comment [Text.Text]
+--  | Items (NE.NonEmpty (Item b))
   deriving (Eq, Show)
-  -- Items (NE.NonEmpty (Item b))
 
 -- data Item b = Item 
 --   { itemType :: ItemType
@@ -87,8 +88,7 @@ data QoutedSentences i = QoutedSentences
   deriving (Eq, Show)
 
 data Qoute 
-  = SingleQoute
-  | DoubleQoute
+  = DoubleQoute
   | Parenthesis
   | Emph
   | Strong
@@ -100,5 +100,33 @@ data Inline i
   | Colon
   | SemiColon
   | Hyphen
+  | Number Text.Text
   | Qouted (QoutedSentences i)
   deriving (Eq, Show)
+
+data DocAlgebra s b i a = DocAlgebra
+  { onSections :: s -> a
+  , onBlocks :: b -> a
+  , onInlines :: i -> a
+  }
+
+countSentencesInSimpleInline :: SimpleInline -> Int
+countSentencesInSimpleInline (SimpleInline inline) = case inline of
+  Qouted q -> countSentencesInQouted countSentencesInSimpleInline q
+  _ -> 0
+
+countSentences :: (i -> Int) -> Sentences i -> Int
+countSentences countSentencesInInline (Sentences as bs) = 
+  sum (map countSentencesInSentence as) + (case bs of
+    [] -> 0
+    _ -> 1 + sum (map countSentencesInInline bs) 
+  )
+ where 
+  countSentencesInSentence (Sentence is _) = 
+    1 + sum (fmap countSentencesInInline is)
+   
+countSentencesInQouted :: (i -> Int) -> QoutedSentences i -> Int
+countSentencesInQouted countSentencesInInline (QoutedSentences _ s) = 
+  countSentences countSentencesInInline s
+
+

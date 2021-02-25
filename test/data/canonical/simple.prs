@@ -9,3 +9,35 @@ With multiple sentences on multiple lines!!
 
 A longer paragraph with multiple lines of text.
 And many sentences, which can be hard to parse.
+Also a single unfinished sentence
+
+## Inlines
+
+There exist many inlines, commas ",", colons ":", and semicolons ";".
+Furthermore, we have numbers (100), and decimal numbers (10.0) and separated numbers (1,000.0).
+We can also add currency $100, $ 100, and 100,- kr, which are rendered differently.
+We can also use some special characters æøå.
+
+-- And comments, are newer changed
+-- like this.
+
+## Sub-sentences
+
+It is possible to write longer "sentences" with stuff in them; like parentheses (like this!).
+We can also add other things like /italic/ and *bold*.
+
+When there are multiple sentences in a qoute, they will be placed on a new line:
+"hello, this is a dual sentence qoute!
+like this".
+
+/*We can even have italic and bolded code on two lines.
+For example, like this!
+Or this*/
+/*The same for the second sentence fragment.
+Like this.*/
+
+### "Qoutes in Headers are possible"
+
+### "Even with two! Sentences!"
+
+### And two sentences in a header? That's okay.

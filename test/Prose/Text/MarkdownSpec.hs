@@ -34,15 +34,19 @@ spec :: Spec
 spec = do
   specInline
   specSectionText
+  specBlock
+  specSection
   specAllDataFiles
   --specSentences
-  --specBlock
 
 specInline :: Spec 
 specInline = describe "inline" do
   describe "examples" do
     example "world" ( SimpleInline $ Word "world" )
     example "," (SimpleInline Comma)
+    example "10.0" (SimpleInline $ Number "10.0")
+    example "1,000.0" (SimpleInline $ Number "1,000.0")
+    example "1,000.-" (SimpleInline $ Number "1,000.-")
 
   serializeRoundtrip (runReaderT genSimpleInline genConfig) sSimpleInline pSimpleInline
 
@@ -67,6 +71,17 @@ specSectionText = describe "section text" do
     it "should parse" do
       parse pSectionText txt \a -> do
         a `shouldSatisfy` (>= 0) . length
+
+specBlock :: Spec 
+specBlock = describe "block" do
+  modifyMaxSuccess (const 20) $ 
+    serializeRoundtrip (runReaderT genSimpleBlock genConfig) sB pB 
+
+specSection :: Spec 
+specSection = describe "section" do
+  modifyMaxSuccess (const 20) $ 
+    serializeRoundtrip (runReaderT genSimpleSection genConfig) sDoc pDoc
+
 
 specAllDataFiles :: Spec
 specAllDataFiles = describe "on **/*.prs" do
@@ -93,7 +108,6 @@ onCanonicalFiles k = do
 onFile :: FilePath -> (Text.Text -> SpecWith ()) -> SpecWith ()
 onFile file k = describe file do 
   k =<< runIO (Text.readFile file)
-
 
 
 -- specSentences :: Spec 
@@ -170,7 +184,6 @@ parseOrFail p txt run = case runReader (runParserT (p <* eof) "" txt) simplePase
 --   Left _ -> return ()
 --   Right d -> fail ("parsed it" ++ show d)
 -- 
--- 
 
 serializeRoundtrip :: 
   (Show i, Eq i) 
@@ -181,6 +194,6 @@ serializeRoundtrip ::
 serializeRoundtrip gen s p = prop "can serialize and parse" do
   i <- forAll gen
   let txt = serialize $ s i simpleSerializeConfig
+  footnote (Text.unpack txt)
   parse p txt \x -> do
     txt === serialize (s x simpleSerializeConfig)
-
