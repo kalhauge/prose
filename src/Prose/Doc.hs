@@ -47,21 +47,21 @@ data Section s b i = Section
 data Block b i
   = Para (Sentences i)
   | Comment [Text.Text]
---  | Items (NE.NonEmpty (Item b))
+  | Items (NE.NonEmpty (Item b))
   deriving (Eq, Show)
 
--- data Item b = Item 
---   { itemType :: ItemType
---   , itemTodo :: Maybe Bool
---   , itemContents :: NE.NonEmpty b
---   } 
---   deriving (Eq, Show)
--- 
--- data ItemType 
---   = Minus
---   | Plus
---   | Times
---   deriving (Eq, Show)
+data Item b = Item 
+  { itemType :: ItemType
+  , itemTodo :: Maybe Bool
+  , itemContents :: NE.NonEmpty b
+  } 
+  deriving (Eq, Show)
+
+data ItemType 
+  = Minus
+  | Plus
+  | Times
+  deriving (Eq, Show, Enum, Bounded)
 
 data Sentences i = Sentences 
   { closed :: [Sentence i]
@@ -124,7 +124,7 @@ countSentences countSentencesInInline (Sentences as bs) =
  where 
   countSentencesInSentence (Sentence is _) = 
     1 + sum (fmap countSentencesInInline is)
-   
+
 countSentencesInQouted :: (i -> Int) -> QoutedSentences i -> Int
 countSentencesInQouted countSentencesInInline (QoutedSentences _ s) = 
   countSentences countSentencesInInline s

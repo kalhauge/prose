@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
-
 -- |
 --
 -- Parse a doc from Markdown.
@@ -332,7 +332,13 @@ pBlock = do
 sBlock :: Serializer s b i (Block b i)
 sBlock = \case 
   Para sb -> sSentences sb 
-  Comment items -> const (S.vsep (map (\txt -> "--" <> S.pretty txt) items))
+  Comment comments -> const (S.vsep (map (\txt -> "--" <> S.pretty txt) comments))
+  Items items -> flip foldMap items \(Item tpe _ blocks) ->
+    ( case tpe of
+        Minus -> "-"
+        Plus -> "+"
+        Times -> "*"
+    ) <> const S.space <> sBlocks (NE.toList blocks)
 
 sBlocks :: Serializer s b i [b] 
 sBlocks = fold 

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RecordWildCards #-}
 module Prose.DocSpec where
 
@@ -72,8 +73,14 @@ genSimpleBlock :: (MonadGen m, MonadReader GenerateConfig m) => m SimpleBlock
 genSimpleBlock = SimpleBlock <$> genBlock genSimpleBlock genSimpleInline
 
 genBlock :: (MonadGen m, MonadReader GenerateConfig m) => m b -> m i -> m (Block b i)
-genBlock _ mi = Gen.choice
+genBlock mb mi = Gen.recursive Gen.choice
   [ Para <$> genSentences mi
+  , Comment <$> Gen.list (Range.linear 1 3) (Gen.text (Range.linear 0 32) Gen.alphaNum)
+  ]
+  [ Items <$> Gen.nonEmpty (Range.linear 1 3) do
+      em <- Gen.enumBounded
+      blocks <- Gen.nonEmpty (Range.linear 1 3) mb
+      return $ Item em Nothing blocks
   ]
 
 genSimpleSection :: (MonadGen m, MonadReader GenerateConfig m) => m SimpleSection
