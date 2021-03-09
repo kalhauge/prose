@@ -26,7 +26,7 @@ import Text.Megaparsec hiding (parse)
 import Prose.Text.Markdown
 import Prose.Doc
 
-import Prose.DocSpec 
+import Prose.DocSpec
 
 import SpecHelper
 
@@ -34,12 +34,12 @@ spec :: Spec
 spec = do
   specInline
   specSectionText
-  specBlock
-  specSection
+  -- specBlock
+  -- specSection
   specAllDataFiles
   --specSentences
 
-specInline :: Spec 
+specInline :: Spec
 specInline = describe "inline" do
   describe "examples" do
     example "world" ( SimpleInline $ Word "world" )
@@ -50,36 +50,36 @@ specInline = describe "inline" do
 
   serializeRoundtrip (runReaderT genSimpleInline genConfig) sSimpleInline pSimpleInline
 
- where 
+ where
   example = examples pSimpleInline sSimpleInline
 
   pSimpleInline :: SimpleParser SimpleInline
-  pSimpleInline = SimpleInline <$> pInline 
+  pSimpleInline = SimpleInline <$> pInline
 
   sSimpleInline :: SimpleSerializer SimpleInline
   sSimpleInline = sInline . getInline
 
 
 specSectionText :: Spec
-specSectionText = describe "section text" do 
+specSectionText = describe "section text" do
   onFile "test/data/good/simple.prs" \txt -> do
     it "should contain 2 headers" do
       parse pSectionText txt \a -> do
         a `shouldSatisfy` (== 2) . length
 
-  onGoodFiles \txt -> do 
+  onGoodFiles \txt -> do
     it "should parse" do
       parse pSectionText txt \a -> do
         a `shouldSatisfy` (>= 0) . length
 
-specBlock :: Spec 
+specBlock :: Spec
 specBlock = describe "block" do
-  modifyMaxSuccess (const 20) $ 
-    serializeRoundtrip (runReaderT genSimpleBlock genConfig) sB pB 
+  modifyMaxSuccess (const 20) $
+    serializeRoundtrip (runReaderT genSimpleBlock genConfig) sB pB
 
-specSection :: Spec 
+specSection :: Spec
 specSection = describe "section" do
-  modifyMaxSuccess (const 20) $ 
+  modifyMaxSuccess (const 20) $
     serializeRoundtrip (runReaderT genSimpleSection genConfig) sDoc pDoc
 
 
@@ -88,7 +88,7 @@ specAllDataFiles = describe "on **/*.prs" do
  onGoodFiles \txt -> do
    it "can parse - serialize - parse" do
      parseOrFail pDoc txt \d -> do
-       parseOrFail pDoc (serialize (sDoc d simpleSerializeConfig)) 
+       parseOrFail pDoc (serialize (sDoc d simpleSerializeConfig))
         (`shouldBe` d)
  onCanonicalFiles \txt -> do
    it "can parse - serialize" do
@@ -106,90 +106,90 @@ onCanonicalFiles k = do
   forM_ files (`onFile` k)
 
 onFile :: FilePath -> (Text.Text -> SpecWith ()) -> SpecWith ()
-onFile file k = describe file do 
+onFile file k = describe file do
   k =<< runIO (Text.readFile file)
 
 
--- specSentences :: Spec 
+-- specSentences :: Spec
 -- specSentences = describe "sentences" do
 --   describe "examples" do
---     example "Hello, world!" $ 
+--     example "Hello, world!" $
 --       Sentence [Word "Hello", Comma, Word "world"] [Exclamation]
--- 
+--
 --     parseMulitLineOnly "Hello, \nworld!" $
 --       Sentence [Word "Hello", Comma, Word "world"] [Exclamation]
--- 
+--
 --     parseNot "Hello, \n\nworld!"
 --     parseNot "Hello, \n world!"
--- 
+--
 --     parseNotSingleLine "Hello, \nworld!"
--- 
---   serializeRoundtrip 
---     (genSentence genInline) 
---     (sSentence sInlineWithSpace sInline) 
+--
+--   serializeRoundtrip
+--     (genSentence genInline)
+--     (sSentence sInlineWithSpace sInline)
 --     (pMultiLineSentence 0 pInline)
--- 
---  where 
+--
+--  where
 --   example = examples (pMultiLineSentence 0 pInline) (sSentence sInlineWithSpace sInline)
--- 
---   parseMulitLineOnly txt a = it ("should parse " <> show txt) $ do 
+--
+--   parseMulitLineOnly txt a = it ("should parse " <> show txt) $ do
 --     parse (pMultiLineSentence 0 pInline) txt (`shouldBe` a)
---   
+--
 --   parseNot :: Text.Text -> Spec
 --   parseNot txt = it ("should not parse " <> show txt) $ do
 --     shouldNotParse (pMultiLineSentence 0 pInline) txt
 --     True `shouldBe` True
---   
+--
 --   parseNotSingleLine :: Text.Text -> Spec
 --   parseNotSingleLine txt = it ("should not parse " <> show txt) $ do
 --     shouldNotParse (pSingleLineSentence pInline) txt
 --     True `shouldBe` True
--- 
--- 
--- specBlock :: Spec 
+--
+--
+-- specBlock :: Spec
 -- specBlock = describe "block" do
 --   describe "examples" do
 --     parseOnly "Hello, World!\nThis is a \nsentence.\n\n" $
---       Para 
+--       Para
 --         [ Sentence [Word "Hello", Comma, Word "World"] [Exclamation]
 --         , Sentence [Word "This", Word "is", Word "a", Word "sentence"] [Period]
 --         ]
--- 
---  where 
---   parseOnly txt a = it ("should parse " <> show txt) $ do 
+--
+--  where
+--   parseOnly txt a = it ("should parse " <> show txt) $ do
 --     parse (pBlock pInline) txt (`shouldBe` a)
--- 
+--
 
 examples :: (Show t, Eq t) => SimpleParser t -> SimpleSerializer t -> Text.Text -> t -> Spec
 examples p s str item = do
   describe (show str) do
-    it "should parse" $ 
+    it "should parse" $
       parse p str (`shouldBe` item)
-    it "should serialize" $ 
+    it "should serialize" $
       serialize (s item simpleSerializeConfig) `shouldBe` str
 
 parse :: MonadFail m => SimpleParser i -> Text.Text -> (i -> m ()) -> m ()
-parse p txt run = case runReader (runParserT (p <* eof) "" txt) simplePaserConfig of 
+parse p txt run = case runReader (runParserT (p <* eof) "" txt) simplePaserConfig of
   Left err -> fail (errorBundlePretty err)
   Right d -> run d
 
 parseOrFail :: SimpleParser i -> Text.Text -> (i -> IO ()) -> IO ()
-parseOrFail p txt run = case runReader (runParserT (p <* eof) "" txt) simplePaserConfig of 
+parseOrFail p txt run = case runReader (runParserT (p <* eof) "" txt) simplePaserConfig of
   Left err -> expectationFailure (errorBundlePretty err)
   Right d -> run d
 
--- 
+--
 -- shouldNotParse :: (Show i, MonadFail m) => Parser i -> Text.Text ->  m ()
--- shouldNotParse p txt = case runParser (p <* eof) "" txt of 
+-- shouldNotParse p txt = case runParser (p <* eof) "" txt of
 --   Left _ -> return ()
 --   Right d -> fail ("parsed it" ++ show d)
--- 
+--
 
-serializeRoundtrip :: 
-  (Show i, Eq i) 
-  => GenT Identity i 
-  -> SimpleSerializer i 
-  -> SimpleParser i 
+serializeRoundtrip ::
+  (Show i, Eq i)
+  => GenT Identity i
+  -> SimpleSerializer i
+  -> SimpleParser i
   -> Spec
 serializeRoundtrip gen s p = prop "can serialize and parse" do
   i <- forAll gen

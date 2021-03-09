@@ -1,5 +1,7 @@
+CMD=cabal new-repl test:prose-test --repl-options=-fno-break-on-exception --repl-options=-fno-break-on-error
+
 develop:
-	ghcid -c 'stack ghci prose:lib prose:test:prose-test --ghci-options -fobject-code' --test ':main --rerun'
+	ghcid -c '${CMD}' --test ':main --rerun'
 
 develop-all:
-	ghcid -c 'stack ghci prose:lib prose:test:prose-test --ghci-options -fobject-code' --test ':main'
+	ghcid -c '${CMD}' --test ':main'

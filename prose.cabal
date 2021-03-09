@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.3.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 31f417936cf7030fe04f200052cb68760df2daa9aa96fed60732e9b9372e704e
 
 name:           prose
 version:        0.1.0.0
@@ -32,10 +34,10 @@ library
       Paths_prose
   hs-source-dirs:
       src
-  ghc-options: -Wall
+  ghc-options: -Wall -haddock
   build-depends:
       base >=4.7 && <5
-    , megaparsec >=9.0 && <10
+    , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , parser-combinators
     , prettyprinter >=1.2
@@ -48,10 +50,10 @@ executable prose-exe
       Paths_prose
   hs-source-dirs:
       app
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , megaparsec >=9.0 && <10
+    , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , parser-combinators
     , prettyprinter >=1.2
@@ -70,7 +72,7 @@ test-suite prose-test
       Paths_prose
   hs-source-dirs:
       test
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Glob
     , base
@@ -81,7 +83,7 @@ test-suite prose-test
     , hspec-discover >=2.7
     , hspec-expectations-pretty-diff
     , hspec-hedgehog
-    , megaparsec >=9.0 && <10
+    , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , parser-combinators
     , prettyprinter >=1.2

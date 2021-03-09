@@ -41,3 +41,29 @@ Like this.*/
 ### "Even with two! Sentences!"
 
 ### And two sentences in a header? That's okay.
+
+## Itemized Lists
+
+We can create itemized lists:
+
+- One item.
+- Two items.
+- Three items.
+
+Items can have different starting annotations `*`, `-`, or `+`.
+
+- Minus
++ Plus
+* Star
+
+Finally we have nested lists, and paragraphs.
+When items have nested items or paragraphs they are separated by spaces:
+
+- Item one:
+  - Nested one.
+  - Nested two
+
+- Item two.
+
+  With an extra paragraph.
+

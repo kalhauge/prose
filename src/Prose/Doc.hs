@@ -4,12 +4,12 @@ module Prose.Doc where
 import Prelude hiding (Word)
 import qualified Data.List.NonEmpty as NE
 
--- text 
+-- text
 import qualified Data.Text as Text
 
 type Doc = SimpleSection
 
-newtype SimpleSection = SimpleSection 
+newtype SimpleSection = SimpleSection
   { getSection :: Section SimpleSection SimpleBlock SimpleInline }
   deriving (Eq)
 
@@ -22,17 +22,17 @@ newtype SimpleInline = SimpleInline
   deriving (Eq)
 
 instance Show SimpleSection where
-  showsPrec n (SimpleSection s) = 
+  showsPrec n (SimpleSection s) =
     showParen (n > app_prec) (showString "smpl " . showsPrec (app_prec + 1) s)
    where app_prec = 10
 
 instance Show SimpleBlock where
-  showsPrec n (SimpleBlock s) = 
+  showsPrec n (SimpleBlock s) =
     showParen (n > app_prec) (showString "smpl " . showsPrec (app_prec + 1) s)
    where app_prec = 10
 
 instance Show SimpleInline where
-  showsPrec n (SimpleInline s) = 
+  showsPrec n (SimpleInline s) =
     showParen (n > app_prec) (showString "smpl " . showsPrec (app_prec + 1) s)
    where app_prec = 10
 
@@ -47,26 +47,27 @@ data Section s b i = Section
 data Block b i
   = Para (Sentences i)
   | Comment [Text.Text]
-  | Items (NE.NonEmpty (Item b))
+  | Items (NE.NonEmpty (Item b i))
   deriving (Eq, Show)
 
-data Item b = Item 
+data Item b i = Item
   { itemType :: ItemType
   , itemTodo :: Maybe Bool
-  , itemContents :: NE.NonEmpty b
-  } 
+  , itemTitle :: Sentences i
+  , itemContents :: [b]
+  }
   deriving (Eq, Show)
 
-data ItemType 
+data ItemType
   = Minus
   | Plus
   | Times
   deriving (Eq, Show, Enum, Bounded)
 
-data Sentences i = Sentences 
+data Sentences i = Sentences
   { closed :: [Sentence i]
   , final :: [i]
-  } 
+  }
   deriving (Eq, Show)
 
 data Sentence i = Sentence
@@ -81,13 +82,13 @@ data End
   | Period
   deriving (Eq, Show, Enum, Bounded)
 
-data QoutedSentences i = QoutedSentences 
+data QoutedSentences i = QoutedSentences
   { qoutedType :: Qoute
   , qoutedSentences :: Sentences i
-  } 
+  }
   deriving (Eq, Show)
 
-data Qoute 
+data Qoute
   = DoubleQoute
   | Parenthesis
   | Emph
@@ -96,10 +97,11 @@ data Qoute
 
 data Inline i
   = Word Text.Text
+  | Broken (NE.NonEmpty Text.Text)
   | Comma
   | Colon
   | SemiColon
-  | Hyphen
+  | Verbatim Text.Text
   | Number Text.Text
   | Qouted (QoutedSentences i)
   deriving (Eq, Show)
@@ -116,17 +118,17 @@ countSentencesInSimpleInline (SimpleInline inline) = case inline of
   _ -> 0
 
 countSentences :: (i -> Int) -> Sentences i -> Int
-countSentences countSentencesInInline (Sentences as bs) = 
+countSentences countSentencesInInline (Sentences as bs) =
   sum (map countSentencesInSentence as) + (case bs of
     [] -> 0
-    _ -> 1 + sum (map countSentencesInInline bs) 
+    _ -> 1 + sum (map countSentencesInInline bs)
   )
- where 
-  countSentencesInSentence (Sentence is _) = 
+ where
+  countSentencesInSentence (Sentence is _) =
     1 + sum (fmap countSentencesInInline is)
 
 countSentencesInQouted :: (i -> Int) -> QoutedSentences i -> Int
-countSentencesInQouted countSentencesInInline (QoutedSentences _ s) = 
+countSentencesInQouted countSentencesInInline (QoutedSentences _ s) =
   countSentences countSentencesInInline s
 
 
