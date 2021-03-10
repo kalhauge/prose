@@ -56,14 +56,32 @@ Items can have different starting annotations `*`, `-`, or `+`.
 + Plus
 * Star
 
+Items can contain multiple sentences
+
+- First setences.
+  Second sentence.
+  Third sentence.
+
 Finally we have nested lists, and paragraphs.
 When items have nested items or paragraphs they are separated by spaces:
 
 - Item one:
+
+  Hello paragraph
+
   - Nested one.
-  - Nested two
+  - Nested two.
+  - Nested three.
+
+  Some other thing
+
+  - Another nested list
 
 - Item two.
 
   With an extra paragraph.
 
+- Item three.
+
+  -- With comment lines
+  -- like this

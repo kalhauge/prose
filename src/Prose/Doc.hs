@@ -97,7 +97,6 @@ data Qoute
 
 data Inline i
   = Word Text.Text
-  | Broken (NE.NonEmpty Text.Text)
   | Comma
   | Colon
   | SemiColon

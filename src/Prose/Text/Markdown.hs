@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -11,93 +10,21 @@
 -- Parse a doc from Markdown.
 module Prose.Text.Markdown where
 
--- mtl
-import Control.Monad.Reader
-
 -- base
-import Data.Void
-import Data.Maybe
 import Data.String
 import Data.Foldable
 import Data.Semigroup
-import Data.Functor
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
-import Data.Char hiding (Space)
 
 -- text
 import qualified Data.Text as Text
-
--- megaparsec
-import Text.Megaparsec hiding (some, sepBy1, sepEndBy1)
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Debug as DBG
-
--- parser-combinators
-import Control.Monad.Combinators.NonEmpty
 
 -- prettyprinter
 import qualified Data.Text.Prettyprint.Doc as S
 import qualified Data.Text.Prettyprint.Doc.Render.Text as S
 
 import Prose.Doc
-
-dbg :: (VisualStream s, ShowErrorComponent e, Show a) =>
-             String -> ParsecT e s m a -> ParsecT e s m a
-dbg str =
-  if False
-  then DBG.dbg str
-  else id
-
-data ParserConfig s b i = ParserConfig
-  { pInline' :: Parser s b i i
-  , pBlock' :: Parser s b i b
-  , pSection' :: Parser s b i ([s] -> s)
-  , pActiveQoutes :: [Qoute]
-  , pIndention :: Maybe Int
-  }
-
-type Parser s b i = ParsecT Void Text.Text (Reader (ParserConfig s b i))
-
-type SimpleParser = Parser SimpleSection SimpleBlock SimpleInline
-
-simplePaserConfig :: ParserConfig SimpleSection SimpleBlock SimpleInline
-simplePaserConfig = ParserConfig
-  { pInline' = SimpleInline <$> pInline
-  , pBlock' = SimpleBlock <$> pBlock
-  , pSection' = do
-      sec <- pSectionX
-      return (SimpleSection . sec)
-  , pActiveQoutes = []
-  , pIndention = Just 0
-  }
-
-pI :: Parser s b i i
-pI = join (asks pInline')
-
-pB :: Parser s b i b
-pB = join (asks pBlock')
-
-pS :: Parser s b i ([s] -> s)
-pS = join (asks pSection')
-
-pSingleLine :: Parser b s i a -> Parser b s i a
-pSingleLine = local \a -> a
-  { pIndention =  Nothing
-  }
-
-pIndent :: Parser b s i a -> Parser b s i a
-pIndent =  local \a -> a
-  { pIndention = case pIndention a of
-      Just n -> Just $ n + 2
-      Nothing -> Just 2
-  }
-
-pLeadingSpaces :: Parser b s i ()
-pLeadingSpaces = label "leading spaces" $ asks pIndention >>= \case
-  Just n -> void $ count n (char ' ')
-  Nothing -> return ()
-
 
 type Serialized = S.Doc ()
 type Serializer s b i a = a -> SerializeConfig s b i -> Serialized
@@ -110,6 +37,7 @@ data SerializeConfig s b i = SerializeConfig
   , sSection' :: Int -> Serializer s b i s
   , sSentenceSeperator :: Serialized
   , sSentenceCounter :: i -> Int
+  , sHasOnlyItems :: b -> Bool
   }
 
 instance IsString (SerializeConfig s b i -> Serialized) where
@@ -128,6 +56,7 @@ simpleSerializeConfig = SerializeConfig
   , sSection' = \n -> sSection n . getSection
   , sSentenceSeperator = S.hardline
   , sSentenceCounter = countSentencesInSimpleInline
+  , sHasOnlyItems = let only = onlyItems only . getBlock in only
   }
 
 serialize :: Serialized -> Text.Text
@@ -150,7 +79,7 @@ sInline :: Serializer s b i (Inline i)
 sInline i cfg = case i of
   Word x -> S.pretty x
   Number x -> S.pretty x
-  Broken xs -> fold . L.intersperse "-" . map S.pretty . NE.toList $ xs
+  -- Broken xs -> fold . L.intersperse "-" . map S.pretty . NE.toList $ xs
   Comma -> ","
   Colon -> ":"
   SemiColon -> ";"
@@ -163,7 +92,7 @@ sInlineWithSpace _ i2 cfg = spaces <> sInline i2 cfg
   spaces = case i2 of
     Word _ -> S.space
     Number _ -> S.space
-    Broken _ -> S.space
+    -- Broken _ -> S.space
     Verbatim _ -> S.space
     Qouted q
       | countSentencesInQouted (sSentenceCounter cfg) q > 1 ->
@@ -171,43 +100,6 @@ sInlineWithSpace _ i2 cfg = spaces <> sInline i2 cfg
       | otherwise ->
         S.space
     _ -> mempty
-
-pInline :: Show i => Parser s b i (Inline i)
-pInline = dbg "inline" . label "inline" $ choice
-  [ char ',' $> Comma
-  , char ':' $> Colon
-  , char ';' $> SemiColon
-  , do
-      void $ char '`'
-      v <- Verbatim <$> takeWhileP (Just "verbatim") (/= '`')
-      void $ char '`'
-      return v
-  , try $ do
-      digits <- takeWhile1P (Just "digits") isNumber
-      parts <- many $ try do
-        x <- satisfy (\t -> t == ',' || t == '.')
-        Text.cons x <$> takeWhile1P (Just "digits") isNumber
-      str <- optional $ try do
-        x <- satisfy (\t -> t == ',' || t == '.')
-        Text.cons x <$> (string "-" <* notFollowedBy pWord)
-      return . Number $ Text.concat (digits : parts) <> fromMaybe mempty str
-  , sepEndBy1 pWord (char '-') >>= \case
-      w NE.:| [] -> pure $ Word w
-      w -> pure $ Broken w
-  , Qouted <$> pQoutedSentences
-  ]
- where
-  pWord = label "a word" do
-    takeWhile1P (Just "a word") (\a -> isAlphaNum a || a == '$' || a == '\'')
-
--- Sentence
-
-pEnd :: Parser s b i End
-pEnd = label "end of sentence" $ choice
-  [ char '!' $> Exclamation
-  , char '?' $> Question
-  , char '.' $> Period
-  ]
 
 sEnd :: Serializer s b i End
 sEnd = \case
@@ -245,107 +137,6 @@ sQoutedSentences (QoutedSentences qoute sentences) = quoted
     Strong -> "*" <> sSentences sentences <> "*"
 
 
--- pSingleLineSentence :: Parser s b i (Sentence i)
--- pSingleLineSentence = local (\a -> a { pSpace = hspace }) pSentence
---
--- pMultiLineSentence :: Int -> Parser s b i (Sentence i)
--- pMultiLineSentence ident =
---   local (\a -> a { pSpace = (hspace <* void (optional $ eol <* count ident (char ' ')))})
---   pSentence
-
-pSentences :: Show i => Parser s b i (Sentences i)
-pSentences = dbg "sentence" do
-  ParserConfig { pInline', pIndention } <- ask
-  let
-    pSpace = dbg "pspace" case pIndention of
-      Just n -> hspace <* optional (void eol <* count n " ")
-      Nothing -> hspace
-    go sens = do
-      x <- pInline'
-      r <- many (try (pSpace *> pInline'))
-      let i = x NE.:| r
-      ends <- dbg "ends" $ many pEnd
-      case NE.nonEmpty ends of
-        Nothing -> return $ Sentences (reverse sens) (NE.toList i)
-        Just ends' ->
-          let sen = Sentence i ends'
-          in choice
-            [ do
-                _ <- try (pSpace *> lookAhead pInline')
-                go (sen:sens)
-            , return $ Sentences (reverse (sen:sens)) []
-            ]
-  go []
-
-pQoutedSentences :: Show i => Parser s b i (QoutedSentences i)
-pQoutedSentences = do
-  qoute <- startQoute
-  sens <- local (\a -> a { pActiveQoutes = qoute: pActiveQoutes a}) pSentences
-  case qoute of
-    -- SingleQoute -> void $ label "end of qoute (')" (char '\'')
-    DoubleQoute -> void $ label "end of qoute (\")" (char '\"')
-    Emph -> void . label "end of emph (/)" $ char '/'
-    Strong -> void . label "end of strong (*)" $ char '*'
-    Parenthesis -> void . label "end of paranthesis ())" $ char ')'
-
-  return $ QoutedSentences qoute sens
-
- where
-  startQoute = try $ do
-    qoutes <- asks pActiveQoutes
-    x <-  choice
-      [-- char '\'' $> SingleQoute ,
-        char '"' $> DoubleQoute
-      , string "*" $> Strong
-      , char '/' $> Emph
-      , char '(' $> Parenthesis
-      ] <* notFollowedBy (endQoute <|> void pEnd)
-
-    if x `elem` qoutes
-    then fail "Already included"
-    else return x
-
-  -- qouteSymbol = void $ oneOf ['\'', '"', '*']
-  endQoute = void do
-    many (oneOf ['\'', '"', '*', '/']) <* (space1 <|> eof)
-
--- Blocks
-
--- sSentences :: Serializer i -> Serializer [Sentence i]
--- sSentences sInline' =
---   foldMap (S.hsep . map sInline' . sentenceContent)
---
-
-pBlock :: Show i => Parser s b i (Block b i)
-pBlock = pLeadingSpaces *> choice
-  [ Comment <$> (string "--" *> comment pure)
-  , Items <$> sepEndBy1 pItem (many eol)
-  , do
-    sentence <- pSentences
-    hspace
-    void (try $ eol <* some eol) <|> (space <* eof)
-    return $ Para sentence
-  ]
-
- where
-  comment :: ([Text.Text] -> Parser s b i k) -> Parser s b i k
-  comment k = do
-    t <- takeWhileP (Just "a comment line") (/= '\n')
-    try (eol *> string "--") *> comment (k . (t:)) <|> k [t]
-
-  pItem = do
-    notFollowedBy (string "--")
-    itemType <- label "an item ('-', '*', or '+')" $ choice
-      [ char '-' $> Minus
-      , char '+' $> Plus
-      , char '*' $> Times
-      ]
-    hspace1
-    let itemTodo = Nothing
-    itemTitle <- pSentences
-    itemContents <- pIndent (many pB)
-    pure $ Item {..}
-
 sBlock :: Serializer s b i (Block b i)
 sBlock = \case
   Para sb ->
@@ -353,108 +144,61 @@ sBlock = \case
     <> const S.hardline
 
   Comment comments ->
-    const (S.vsep (map (\txt -> "--" <> S.pretty txt) comments))
+    const $
+      S.vsep (map (\txt -> "--" <> S.pretty txt) comments)
+      <> S.hardline
 
-  Items items -> flip foldMap items \(Item tpe _ sens blocks) ->
-    ( case tpe of
-        Minus -> "-"
-        Plus -> "+"
-        Times -> "*"
-    ) <> const S.space
-      <> sSentences sens
-      <> sBlocks blocks
-      <> const S.hardline
-
-sBlocks :: Serializer s b i [b]
-sBlocks = fold
-  . L.intersperse (const S.hardline)
-  . map sB
-
--- Sections
-
--- | Seperate the file into unparsed sections. This is usefull to
--- make parseing more lazy.
-pSectionText :: forall s b i. Parser s b i (NE.NonEmpty (Int, State Text.Text Void))
-pSectionText = go id
+  Items items -> \cfg ->
+    if all (all (sHasOnlyItems cfg) . itemContents) items
+    then compressed items cfg <> S.hardline
+    else S.vsep [ sItem s cfg | s <- NE.toList items ]
 
  where
-  go :: (NE.NonEmpty (Int, State Text.Text Void) -> a)
-    -> Parser s b i a
-  go k = do
-    header <- Text.length <$> takeWhile1P (Just "header") (== '#')
-    hspace
-    st <- getParserState
-    txt <- Text.intercalate "\n" <$> linesUntilNext id
-    let item = (header, st {stateInput = txt})
-    choice
-      [ go (k . (item NE.<|))
-      , return (k $ item NE.:| [])
-      ]
+  compressed items cfg =
+    S.vsep [ sCompressedItem s cfg | s <- NE.toList items ]
 
-  linesUntilNext :: ([Text.Text] -> a) -> Parser s b i a
-  linesUntilNext k = do
-    txt <- takeWhileP Nothing (/= '\n')
-    void eol <|> eof
-    choice
-      [ do
-          lookAhead (void (char '#') <|> eof)
-          return (k [txt])
-      , do
-          linesUntilNext (k . (txt:))
-      ]
-
-type PState = State Text.Text Void
-
-pDoc :: Parser s b i s
-pDoc = do
-  x NE.:| rest <- pSectionText
-  case pRec x rest of
-    (p, []) -> p
-    (_, (_, s):_) -> do
-      setParserState s
-      fail "unexpected header"
- where
-  pRec ::
-      (Int, PState)
-      -> [(Int, PState)]
-      -> (Parser s b i s, [(Int, PState)])
-  pRec (n, s) x = (p, others)
-   where
-    (subs, others) = span (\(n', _) -> n < n') x
-    p = do
-      setParserState s
-      p' <- pS
-      subs' <- sequence $ split subs
-      return (p' subs')
-
-    split :: [(Int, State Text.Text Void)] -> [Parser s b i s]
-    split = \case
-      [] -> []
-      a:rest ->
-        let (p', x') = pRec a rest
-        in p':split x'
-
-pSectionX :: Show i => Parser s b i ([s] -> Section s b i)
-pSectionX = do
-  sectionTitle <- pSingleLine pSentences
-  choice
-    [ do
-        let sectionContent = []
-        eof
-        return $ \sectionSubs -> Section { .. }
-    , do
-        _ <- some eol
-        sectionContent <- many pB
-        return $ \sectionSubs -> Section { ..  }
+  sItem (Item tpe _ sens blocks) cfg = S.hang 2 . fold $
+    [ sign tpe
+    , S.space
+    , sSentences sens cfg
+    , case blocks of
+        [] -> S.hardline
+        _ -> S.hardline <> S.hardline <> sBlocks blocks cfg
     ]
 
+  sCompressedItem (Item tpe _ sens blocks) cfg = S.hang 2 . fold $
+    [ sign tpe
+    , S.space
+    , sSentences sens cfg
+    , case blocks of
+        [] -> mempty
+        _ -> S.hardline <> S.hardline <> sBlocks blocks cfg
+    ]
+
+  sign = \case
+    Minus -> "-"
+    Plus -> "+"
+    Times -> "*"
+
+
+onlyItems :: (b -> Bool) -> Block b i -> Bool
+onlyItems rec = \case
+  Items items ->
+    all (all rec . itemContents) items
+  _ -> False
+
+sBlocks :: Serializer s b i [b]
+sBlocks b cfg =
+  S.vsep (($cfg) <$> map sB b)
 
 sSection :: Int -> Serializer s b i (Section s b i)
 sSection n sec cfg = S.vsep $
-  [ stimes n "#" S.<+> sSingleLine (sSentences (sectionTitle sec)) cfg
-  , case sectionContent sec of
-      [] -> mempty
-      content -> S.hardline <> sBlocks content cfg
+  [ stimes n "#" S.<+> sSingleLine (sSentences $ sectionTitle sec) cfg
+  , mempty
+  ]
+  ++
+  [ sBlocks (sectionContent sec) cfg
+  | not (L.null (sectionContent sec))
   ]
   ++
   [ sS (n + 1) s cfg
@@ -463,21 +207,4 @@ sSection n sec cfg = S.vsep $
 
 sDoc :: SimpleSerializer SimpleSection
 sDoc = sS 1
-
--- pSection :: Int -> Parser SimpleSection
--- pSection level = do
---   _ <- count level $ single '#'
---   _ <- hspace
---   title <- some (pSingleLineSentence pInline)
---   _ <- eol
---   blocks <- many (SimpleBlock <$> pBlock pInline)
---   sections <- many $ pSection (level + 1)
---   return $ SimpleSection (Section title blocks sections)
---
--- pDoc :: Parser SimpleSection
--- pDoc = pSection 1 <* eof
---
---
-
-
 

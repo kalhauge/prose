@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 31f417936cf7030fe04f200052cb68760df2daa9aa96fed60732e9b9372e704e
+-- hash: 02c09a769bec6e4c0d42cd343a8a16f9a42588d84d47a1c3cf8d3dcbf3a7424c
 
 name:           prose
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
   exposed-modules:
       Prose.Doc
       Prose.Text.Markdown
+      Prose.Text.Parser
   other-modules:
       Paths_prose
   hs-source-dirs:
@@ -67,6 +68,7 @@ test-suite prose-test
   other-modules:
       Prose.DocSpec
       Prose.Text.MarkdownSpec
+      Prose.Text.ParserSpec
       Spec
       SpecHelper
       Paths_prose

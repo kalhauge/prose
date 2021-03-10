@@ -19,7 +19,7 @@ import Control.Monad.Reader
 -- hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-import qualified Data.List.NonEmpty as NE
+-- import qualified Data.List.NonEmpty as NE
 
 
 spec :: Spec
@@ -43,13 +43,13 @@ genInline genI = do
   Gen.recursive Gen.choice
     [ Gen.element [Comma, Colon]
     , do
-        wrds <- Gen.nonEmpty (Range.linear 1 3) do
-          c <- Gen.alpha
-          word <- Gen.text (Range.linear 0 32) Gen.alphaNum
-          return $ Text.cons c word
-        case wrds of
-          u NE.:| [] -> pure $ Word u
-          _ -> pure $ Broken wrds
+        c <- Gen.alpha
+        word <- Gen.text (Range.linear 0 32) $
+          Gen.choice
+          [ Gen.alphaNum
+          , Gen.element ['-', '\'', '$']
+          ]
+        pure . Word $ Text.cons c word
     , do
         c <- Gen.alpha
         word <- Gen.text (Range.linear 0 32) Gen.alphaNum
