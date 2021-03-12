@@ -127,6 +127,7 @@ pInline = label "inline" $ choice
   [ char ',' $> Comma
   , char ':' $> Colon
   , char ';' $> SemiColon
+  , char '@' *> (Reference <$> pWord)
   , do
       void $ char '`'
       v <- Verbatim <$> takeWhileP (Just "verbatim") (/= '`')
@@ -140,19 +141,23 @@ pInline = label "inline" $ choice
       str <- optional $ try do
         x <- satisfy (\t -> t == ',' || t == '.')
         Text.cons x <$> (string "-" <* notFollowedBy pWord)
-      return . Number $ Text.concat (digits : parts) <> fromMaybe mempty str
+      points <- many (string "\\." $> ".")
+      return . Number $ Text.concat (digits : parts) <> fromMaybe mempty str <> Text.concat points
   , Word <$> pWord
   , Qouted <$> pQoutedSentences
   ]
  where
   pWord = label "a word" do
     c <- letterChar <|> char '$'
-    txt <- takeWhileP Nothing \a ->
+    txt <- many $ choice
+      [ takeWhile1P Nothing \a ->
         isAlphaNum a
         || a == '-'
         || a == '$'
         || a == '\''
-    return $ Text.cons c txt
+      , string "\\." $> "."
+      ]
+    return $ Text.cons c (Text.concat txt)
 
 -- | This parser will parse inlines until an empty line is found or
 -- the next element is not an inline
@@ -244,15 +249,17 @@ pBlock = label "block" do
 
   items = label "items" do
     i <- item
-    is <- label "more" $ many (try $ optional pEmptyLine *> pIndent *> item)
+    is <- label "more" $ many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> item)
     return $ Items (i NE.:| is)
 
+  pItemType = label "an item ('-', '*', or '+')" $ choice
+    [ char '-' $> Minus
+    , char '+' $> Plus
+    , char '*' $> Times
+    ] <* hspace1
+
   item = label "item" do
-    itemType <- try . label "an item ('-', '*', or '+')" $ choice
-      [ char '-' $> Minus
-      , char '+' $> Plus
-      , char '*' $> Times
-      ] <* hspace1
+    itemType <- try pItemType
     let itemTodo = Nothing
     indent do
       itemTitle <- pSentences

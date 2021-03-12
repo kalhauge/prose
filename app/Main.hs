@@ -1,4 +1,7 @@
 module Main where
 
+import Prose
+
 main :: IO ()
-main = putStrLn "No works yet!"
+main = Prose.app
+

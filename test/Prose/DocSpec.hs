@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RecordWildCards #-}
 module Prose.DocSpec where
@@ -9,6 +10,7 @@ import Prose.Doc
 
 -- base
 import Data.List
+import Data.Foldable
 import qualified Data.List.NonEmpty as NE
 
 -- text
@@ -55,7 +57,8 @@ genInline genI = do
     , do
         c <- Gen.alpha
         word <- Gen.text (Range.linear 0 32) Gen.alphaNum
-        pure $ Word (Text.cons c word)
+        x <- Gen.maybe (Gen.constant ".")
+        pure $ Word (Text.cons c word <> fold x)
     , do
         word <- Gen.text (Range.linear 0 32) Gen.alphaNum
         pure $ Verbatim word

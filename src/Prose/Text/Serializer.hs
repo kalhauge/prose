@@ -69,6 +69,16 @@ singleline s = Serial \cfg -> runSerializer s (cfg { sCfgSingleLine = True })
 sText :: Serializer b i Text.Text
 sText = Serial \_ txt -> Builder.fromText txt
 
+sEscaped :: Serializer b i Text.Text
+sEscaped = Serial \_ txt ->
+  Builder.fromText $ Text.intercalate "\\." (Text.splitOn "." txt)
+
+sEscapedEnd :: Serializer b i Text.Text
+sEscapedEnd = Serial \_ txt ->
+  let normal = Text.dropWhileEnd (== '.') txt
+  in Builder.fromText normal <>
+    stimesMonoid (Text.length txt - Text.length normal) "\\."
+
 sWithCompressedItems :: (Maybe (NE.NonEmpty (ItemTree i)) -> Serializer b i ())
   -> Serializer b i (NE.NonEmpty (Item b i))
 sWithCompressedItems s = Serial \cfg a ->
@@ -92,12 +102,13 @@ sEndLine = "\n"
 
 sInline :: Serializer b i (Inline i)
 sInline = over \case
-  Word x -> x >$ sText
-  Number x -> x >$ sText
+  Word x -> x >$ sEscaped
+  Number x -> x >$ sEscapedEnd
   Comma -> ","
   Colon -> ":"
   SemiColon -> ";"
   Verbatim txt -> "`" <> (txt >$ sText) <> "`"
+  Reference txt -> "@" <> (txt >$ sText)
   Qouted q -> q >$ sQoutedSentences
 
 sInlineSep :: Serializer b i (i, i)

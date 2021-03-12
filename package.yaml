@@ -36,7 +36,7 @@ library:
   source-dirs: src
 
 executables:
-  prose-exe:
+  prose:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -45,6 +45,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - prose
+    - optparse-applicative
 
 tests:
   prose-test:

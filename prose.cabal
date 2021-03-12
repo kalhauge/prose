@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5ef0b640a8e2a2d867aac9087414da950d0af7e908bde3227d5070af6b5cfbcb
+-- hash: 6a650098f36e84026fad4ec9b77a5910431a136fa2a633cb89a14be9bec05812
 
 name:           prose
 version:        0.1.0.0
@@ -28,10 +28,10 @@ source-repository head
 
 library
   exposed-modules:
+      Prose
       Prose.Builder
       Prose.Builder.TH
       Prose.Doc
-      Prose.Text.Markdown
       Prose.Text.Parser
       Prose.Text.Serializer
   other-modules:
@@ -41,6 +41,7 @@ library
   ghc-options: -Wall -haddock
   build-depends:
       base >=4.7 && <5
+    , contravariant
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , parser-combinators
@@ -58,8 +59,10 @@ executable prose-exe
   ghc-options: -Wall -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , contravariant
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
+    , optparse-applicative
     , parser-combinators
     , prettyprinter >=1.2
     , prose
@@ -84,6 +87,7 @@ test-suite prose-test
   build-depends:
       Glob
     , base
+    , contravariant
     , doctest
     , hedgehog
     , hlint

@@ -83,6 +83,7 @@ data Qoute
 
 data Inline i
   = Word Text.Text
+  | Reference Text.Text
   | Comma
   | Colon
   | SemiColon

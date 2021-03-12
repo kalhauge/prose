@@ -49,6 +49,10 @@ specInline = describe "inline" do
   ex "word-" $ Word "word-"
   ex "10,-" $ Number "10,-"
   ex "10" $ Number "10"
+  ex "10\\." $ Number "10."
+  ex "10.00" $ Number "10.00"
+  ex "ex\\." $ Word "ex."
+  ex "@ref" $ Reference "ref"
 
   describe "simple inlines" do
     serializeRoundtrip

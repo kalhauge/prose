@@ -203,6 +203,8 @@ instance Show Inline' where
         showString "verbatim' " . showsPrec (app_prec + 1) w
     Number w -> showParen (n > app_prec) $
         showString "number' " . showsPrec (app_prec + 1) w
+    Reference r -> showParen (n > app_prec) $
+        showString "ref' " . showsPrec (app_prec + 1) r
     Qouted w ->
       showsQoutedSentences n w
    where app_prec = 10

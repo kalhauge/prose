@@ -17,6 +17,7 @@ There exist many inlines, commas ",", colons ":", and semicolons ";".
 Furthermore, we have numbers (100), and decimal numbers (10.0) and separated numbers (1,000.0).
 We can also add currency $100, $ 100, and 100,- kr, which are rendered differently.
 We can also use some special characters æøå.
+Abv\. and list numbers 1\. are okay, but you need to make sure they are escaped.
 
 -- And comments, are newer changed
 -- like this.
