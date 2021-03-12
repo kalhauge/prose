@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6a650098f36e84026fad4ec9b77a5910431a136fa2a633cb89a14be9bec05812
+-- hash: 896840bfea0492a448acbc77bbdd88c71b435b42cbd7e283d9522a5c474e08b6
 
 name:           prose
 version:        0.1.0.0
@@ -32,6 +32,7 @@ library
       Prose.Builder
       Prose.Builder.TH
       Prose.Doc
+      Prose.Pandoc
       Prose.Text.Parser
       Prose.Text.Serializer
   other-modules:
@@ -40,17 +41,21 @@ library
       src
   ghc-options: -Wall -haddock
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , contravariant
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
+    , optparse-applicative
+    , pandoc-types >=1.22
     , parser-combinators
     , prettyprinter >=1.2
     , template-haskell
     , text >=1.2
   default-language: Haskell2010
 
-executable prose-exe
+executable prose
   main-is: Main.hs
   other-modules:
       Paths_prose
@@ -58,11 +63,14 @@ executable prose-exe
       app
   ghc-options: -Wall -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , contravariant
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative
+    , pandoc-types >=1.22
     , parser-combinators
     , prettyprinter >=1.2
     , prose
@@ -76,6 +84,7 @@ test-suite prose-test
   other-modules:
       Prose.BuilderSpec
       Prose.DocSpec
+      Prose.PandocSpec
       Prose.Text.MarkdownSpec
       Prose.Text.ParserSpec
       Spec
@@ -86,7 +95,9 @@ test-suite prose-test
   ghc-options: -Wall -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Glob
+    , aeson
     , base
+    , bytestring
     , contravariant
     , doctest
     , hedgehog
@@ -97,6 +108,8 @@ test-suite prose-test
     , hspec-hedgehog
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
+    , optparse-applicative
+    , pandoc-types >=1.22
     , parser-combinators
     , prettyprinter >=1.2
     , prose

@@ -29,6 +29,10 @@ dependencies:
 - mtl >= 2.2.2 && < 3
 - template-haskell
 - contravariant
+- optparse-applicative
+- pandoc-types >= 1.22
+- aeson
+- bytestring
 
 ghc-options: -Wall -haddock
 

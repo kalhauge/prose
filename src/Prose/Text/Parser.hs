@@ -130,7 +130,7 @@ pInline = label "inline" $ choice
   , char '@' *> (Reference <$> pWord)
   , do
       void $ char '`'
-      v <- Verbatim <$> takeWhileP (Just "verbatim") (/= '`')
+      v <- Verbatim <$> takeWhileP (Just "verbatim") (\i -> i /= '`' && i /= '\n')
       void $ char '`'
       return v
   , try $ do
@@ -270,7 +270,7 @@ pBlock = label "block" do
     ] <* hspace1
 
   item = label "item" do
-    itemType <- try pItemType
+    itemType <- try (hspace *> pItemType)
     let itemTodo = Nothing
     indent do
       itemTitle <- pSentences
