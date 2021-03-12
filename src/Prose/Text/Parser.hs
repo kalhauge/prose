@@ -148,12 +148,13 @@ pInline = label "inline" $ choice
   ]
  where
   pWord = label "a word" do
-    c <- letterChar <|> char '$'
+    c <- letterChar <|> char '$' <|> char '#'
     txt <- many $ choice
       [ takeWhile1P Nothing \a ->
         isAlphaNum a
         || a == '-'
         || a == '$'
+        || a == '#'
         || a == '\''
       , string "\\." $> "."
       ]

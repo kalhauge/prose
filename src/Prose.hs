@@ -15,7 +15,8 @@ app :: IO ()
 app = do
   txt <- Text.hGetContents stdin
   case runSimpleParser pSimpleDoc txt of
-    Left e ->
+    Left e -> do
       Text.hPutStr stderr (Text.pack $ errorBundlePretty e)
+      Text.hPutStr stdout txt
     Right doc ->
       Text.hPutStr stdout (runSimpleSerializer sDoc doc)
