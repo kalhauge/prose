@@ -27,6 +27,8 @@ dependencies:
 - prettyprinter >= 1.2
 - parser-combinators
 - mtl >= 2.2.2 && < 3
+- template-haskell
+- contravariant
 
 ghc-options: -Wall -haddock
 

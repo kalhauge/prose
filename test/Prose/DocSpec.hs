@@ -9,6 +9,7 @@ import Prose.Doc
 
 -- base
 import Data.List
+import qualified Data.List.NonEmpty as NE
 
 -- text
 import qualified Data.Text as Text
@@ -19,8 +20,6 @@ import Control.Monad.Reader
 -- hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
--- import qualified Data.List.NonEmpty as NE
-
 
 spec :: Spec
 spec = return ()
@@ -34,8 +33,11 @@ genConfig = GenerateConfig
   { allowedQoutes = [minBound .. maxBound]
   }
 
-genSimpleInline :: (MonadGen m, MonadReader GenerateConfig m) => m SimpleInline
-genSimpleInline = SimpleInline <$> genInline genSimpleInline
+genSimpleInline ::
+  (MonadGen m, MonadReader GenerateConfig m)
+  => m Inline'
+genSimpleInline =
+  Inline' <$> genInline genSimpleInline
 
 genInline :: (MonadGen m, MonadReader GenerateConfig m) => m i -> m (Inline i)
 genInline genI = do
@@ -72,33 +74,70 @@ genQoutedSentences qoute genI = do
 
 genSentence :: (MonadGen m, MonadReader GenerateConfig m) => m i -> m (Sentence i)
 genSentence genI = Sentence
-  <$> Gen.nonEmpty (Range.linear 1 30) genI
-  <*> Gen.nonEmpty (Range.linear 1 4) Gen.enumBounded
+  <$> Gen.nonEmpty (Range.linear 1 10) genI
+  <*> Gen.nonEmpty (Range.linear 1 3) Gen.enumBounded
 
 genSentences :: (MonadGen m, MonadReader GenerateConfig m) => m i -> m (Sentences i)
-genSentences genI = do
-  xs <- Gen.list (Range.linear 0 10) (genSentence genI)
-  ys <- Gen.list (Range.linear (if null xs then 1 else 0) 10) genI
-  return $ Sentences xs ys
+genSentences genI = Gen.recursive Gen.choice
+  [ OpenSentence <$> Gen.nonEmpty (Range.linear 1 3) genI
+  , ClosedSentence <$> genSentence genI <*> pure Nothing
+  ]
+  [ Gen.subtermM (genSentences genI) \a -> do
+      sens <- genSentence genI
+      pure $ ClosedSentence sens (Just a)
+  ]
 
-genSimpleBlock :: (MonadGen m, MonadReader GenerateConfig m) => m SimpleBlock
-genSimpleBlock = SimpleBlock <$> genBlock genSimpleBlock genSimpleInline
+genSimpleBlock :: (MonadGen m, MonadReader GenerateConfig m) => m Block'
+genSimpleBlock = Block' <$> genBlock genSimpleBlock genSimpleInline
 
 genBlock :: (MonadGen m, MonadReader GenerateConfig m) => m b -> m i -> m (Block b i)
 genBlock mb mi = Gen.recursive Gen.choice
-  [ Para <$> genSentences mi
-  , Comment <$> Gen.list (Range.linear 1 3) (Gen.text (Range.linear 0 32) Gen.alphaNum)
+  [ Para <$> Gen.small (genSentences mi)
+  , Comment <$> Gen.list (Range.linear 1 3) (Gen.text (Range.linear 0 4) Gen.alphaNum)
   ]
   [ Items <$> Gen.nonEmpty (Range.linear 1 3) do
       em <- Gen.enumBounded
-      sens <- genSentences mi
-      blocks <- Gen.list (Range.linear 1 3) mb
+      sens <- Gen.small(genSentences mi)
+      blocks <- Gen.list (Range.linear 0 3) mb
       return $ Item em Nothing sens blocks
   ]
 
-genSimpleSection :: (MonadGen m, MonadReader GenerateConfig m) => m SimpleSection
+genSingeWordSentence ::
+  (MonadGen m, MonadReader GenerateConfig m)
+  => m i
+  -> m (Sentence i)
+genSingeWordSentence genI = Sentence
+  <$> ((NE.:| []) <$> genI)
+  <*> Gen.nonEmpty (Range.linear 1 3) Gen.enumBounded
+
+genSingleWordSentences ::
+  (MonadGen m, MonadReader GenerateConfig m)
+  => m i
+  -> m (Sentences i)
+genSingleWordSentences genI = Gen.recursive Gen.choice
+  [ OpenSentence . (NE.:| []) <$> genI
+  , ClosedSentence <$> genSingeWordSentence genI <*> pure Nothing
+  ]
+  [ Gen.subtermM (genSingleWordSentences genI) \a -> do
+      sens <- genSingeWordSentence genI
+      pure $ ClosedSentence sens (Just a)
+  ]
+
+genItemsBlock :: (MonadGen m, MonadReader GenerateConfig m) => m Block'
+genItemsBlock = do
+  Block' . Items <$> Gen.nonEmpty (Range.linear 1 3) do
+    em <- Gen.enumBounded
+    sens <- Gen.small $ genSingleWordSentences genWord
+    blocks <- Gen.list (Range.linear 0 3) (Block' <$> genBlock genItemsBlock genWord)
+    pure $ Item em Nothing sens blocks
+ where
+   genWord = Inline' . Word <$> Gen.text (Range.singleton 1) Gen.alpha
+
+genSimpleSection ::
+  (MonadGen m, MonadReader GenerateConfig m)
+  => m Section'
 genSimpleSection =
-  SimpleSection <$> genSection genSimpleSection genSimpleBlock genSimpleInline
+  Section' <$> genSection genSimpleSection genSimpleBlock genSimpleInline
 
 genSection :: (MonadGen m, MonadReader GenerateConfig m) => m s -> m b -> m i -> m (Section s b i)
 genSection ms mb mi = do

@@ -1,40 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 module Prose.Doc where
 
 -- base
 import Prelude hiding (Word)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
+-- import Text.Show
 
 -- text
-import qualified Data.Text as Text
-
-type Doc = SimpleSection
-
-newtype SimpleSection = SimpleSection
-  { getSection :: Section SimpleSection SimpleBlock SimpleInline }
-  deriving (Eq)
-
-newtype SimpleBlock = SimpleBlock
-  { getBlock :: Block SimpleBlock SimpleInline }
-  deriving (Eq)
-
-newtype SimpleInline = SimpleInline
-  { getInline :: Inline SimpleInline }
-  deriving (Eq)
-
-instance Show SimpleSection where
-  showsPrec n (SimpleSection s) =
-    showParen (n > app_prec) (showString "smpl " . showsPrec (app_prec + 1) s)
-   where app_prec = 10
-
-instance Show SimpleBlock where
-  showsPrec n (SimpleBlock s) =
-    showParen (n > app_prec) (showString "smpl " . showsPrec (app_prec + 1) s)
-   where app_prec = 10
-
-instance Show SimpleInline where
-  showsPrec n (SimpleInline s) =
-    showParen (n > app_prec) (showString "smpl " . showsPrec (app_prec + 1) s)
-   where app_prec = 10
+import Data.Text qualified as Text
 
 -- | A Section
 data Section s b i = Section
@@ -64,17 +42,25 @@ data ItemType
   | Times
   deriving (Eq, Show, Enum, Bounded)
 
-data Sentences i = Sentences
-  { closed :: [Sentence i]
-  , final :: [i]
-  }
+data Sentences i
+  = OpenSentence (NE.NonEmpty i)
+  | ClosedSentence
+      (Sentence i)
+      (Maybe (Sentences i))
   deriving (Eq, Show)
+
+instance Functor Sentences where
+  fmap fn = \case
+    OpenSentence n ->
+      OpenSentence (fmap fn n)
+    ClosedSentence sn ms->
+      ClosedSentence (fmap fn sn) (fmap (fmap fn) ms)
 
 data Sentence i = Sentence
   { sentenceContent :: NE.NonEmpty i
   , sentenceEnd :: NE.NonEmpty End
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 
 data End
   = Exclamation
@@ -111,23 +97,58 @@ data DocAlgebra s b i a = DocAlgebra
   , onInlines :: i -> a
   }
 
-countSentencesInSimpleInline :: SimpleInline -> Int
-countSentencesInSimpleInline (SimpleInline inline) = case inline of
-  Qouted q -> countSentencesInQouted countSentencesInSimpleInline q
+countSentencesInInline :: Inline' -> Int
+countSentencesInInline (Inline' inline) = case inline of
+  Qouted q -> countSentencesInQouted countSentencesInInline q
   _ -> 0
 
 countSentences :: (i -> Int) -> Sentences i -> Int
-countSentences countSentencesInInline (Sentences as bs) =
-  sum (map countSentencesInSentence as) + (case bs of
-    [] -> 0
-    _ -> 1 + sum (map countSentencesInInline bs)
-  )
- where
-  countSentencesInSentence (Sentence is _) =
-    1 + sum (fmap countSentencesInInline is)
+countSentences cnt = \case
+  OpenSentence x ->
+    1 + sum (fmap cnt x)
+  ClosedSentence (Sentence is _) rest ->
+    1 + sum (fmap cnt is) + maybe 0 (countSentences cnt) rest
+
 
 countSentencesInQouted :: (i -> Int) -> QoutedSentences i -> Int
-countSentencesInQouted countSentencesInInline (QoutedSentences _ s) =
-  countSentences countSentencesInInline s
+countSentencesInQouted count (QoutedSentences _ s) =
+  countSentences count s
 
+newtype ItemTree i = ItemTree (Item (ItemTree i) i)
+
+compressItem :: (b -> Maybe (NE.NonEmpty (Item b i))) -> Item b i -> Maybe (ItemTree i)
+compressItem fn Item {..} = ItemTree <$> do
+  contents <- case itemContents of
+    [c] -> fmap NE.toList . mapM (compressItem fn) =<< fn c
+    [] -> pure []
+    _ -> Nothing
+  pure $ Item
+    { itemType = itemType
+    , itemTodo = itemTodo
+    , itemTitle = itemTitle
+    , itemContents = contents
+    }
+
+compressItem' :: Item Block' Inline' -> Maybe (ItemTree Inline')
+compressItem' = compressItem (\case
+  Block' (Items it) -> Just it
+  _ -> Nothing
+  )
+
+
+type Doc = Section'
+
+newtype Section' = Section'
+  { getSection :: Section Section' Block' Inline' }
+  deriving (Eq)
+
+newtype Block' = Block'
+  { getBlock :: Block Block' Inline' }
+  deriving (Eq)
+
+newtype Inline' = Inline'
+  { getInline :: Inline Inline' }
+  deriving (Eq)
+
+type Item' = Item Block' Inline'
 

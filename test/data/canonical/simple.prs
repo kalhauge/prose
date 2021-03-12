@@ -62,8 +62,8 @@ Items can contain multiple sentences
   Second sentence.
   Third sentence.
 
-Finally we have nested lists, and paragraphs.
-When items have nested items or paragraphs they are separated by spaces:
+Finally we have nested lists and paragraphs.
+When items have nested items or paragraphs they are separated by newlines:
 
 - Item one:
 
@@ -85,3 +85,19 @@ When items have nested items or paragraphs they are separated by spaces:
 
   -- With comment lines
   -- like this
+
+When a list only contains of items, we can compress them:
+
+- First Item
+  - Sub items 1 and
+  - sub items 2
+- Second Item.
+  With multiple sentences.
+  - More subitems.
+
+We can also have two blocks with items, they need to be seperated by two newlines:
+
+- First block
+
+
+- Second Bloc
