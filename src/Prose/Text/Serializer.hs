@@ -148,6 +148,14 @@ sBlock = over \case
       let (i NE.:| its) = itms
       in (sItem $< i) <> foldMap (\i' -> sEndLine <> (sItem $< i')) its
 
+  OrderedItems _n itms ->
+      let (i NE.:| its) = itms
+      in
+        (sNumberedItem 1 $< i)
+        <> foldMap
+          (\(n, i') -> sEndLine <> (sNumberedItem n $< i'))
+          (zip [2..] its)
+
  where
   sItemTree :: Serializer b i (ItemTree i)
   sItemTree = sIndent <> over \(ItemTree (Item it _ tt blks)) -> indent $
@@ -171,6 +179,13 @@ sBlock = over \case
     Minus -> "- "
     Plus  -> "+ "
     Times -> "* "
+
+  sNumberedItem x = sIndent <> over \(OrderedItem _ tt blks) -> indent $
+    (Text.pack (show (x :: Int)) >$ sText) <> ") " <> (sSentences $< tt) <> sEndLine
+     <> case NE.nonEmpty blks of
+          Nothing -> mempty
+          Just blks' ->
+            sEndLine <> (sBlocks $< blks')
 
 sQoutedSentences :: Serializer b i (QoutedSentences i)
 sQoutedSentences = over \(QoutedSentences qoute sens) ->
@@ -247,6 +262,8 @@ simpleSerializeConfig = SerialConfig
       _ -> " "
   , sCfgBlockSep = over \case
     (Block' (Items _), Block' (Items _)) -> sEndLine <> sEndLine
+    (Block' (OrderedItems x1 _), Block' (OrderedItems x2 _))
+      | x1 == x2 -> sEndLine <> sEndLine
     _ -> sEndLine
   , sCfgCompressItem = compressItem'
   }

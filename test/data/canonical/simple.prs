@@ -96,9 +96,24 @@ When a list only contains of items, we can compress them:
   With multiple sentences.
   - More subitems.
 
-We can also have two blocks with items, they need to be seperated by two newlines:
+We can also have two blocks with items, they need to be separated by two newlines:
 
 - First block
 
 
-- Second Bloc
+- Second block
+
+## Numbered lists
+
+We also have numbered lists.
+The numbering is not important and will be forgotten.
+They are differentiated from sentences containing one number: `1.` by using closing parentheses.
+Like this:
+
+1) One
+
+2) Two
+
+3) Three
+
+Numbered lists do not compress right now.

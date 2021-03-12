@@ -103,6 +103,10 @@ genBlock mb mi = Gen.recursive Gen.choice
       sens <- Gen.small(genSentences mi)
       blocks <- Gen.list (Range.linear 0 3) mb
       return $ Item em Nothing sens blocks
+  , OrderedItems <$> Gen.enumBounded <*> Gen.nonEmpty (Range.linear 1 3) do
+      sens <- Gen.small (genSentences mi)
+      blocks <- Gen.list (Range.linear 0 3) mb
+      return $ OrderedItem Nothing sens blocks
   ]
 
 genSingeWordSentence ::

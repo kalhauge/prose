@@ -26,6 +26,7 @@ data Block b i
   = Para (Sentences i)
   | Comment [Text.Text]
   | Items (NE.NonEmpty (Item b i))
+  | OrderedItems OrderType (NE.NonEmpty (OrderedItem b i))
   deriving (Eq, Show)
 
 data Item b i = Item
@@ -40,6 +41,17 @@ data ItemType
   = Minus
   | Plus
   | Times
+  deriving (Eq, Show, Enum, Bounded)
+
+data OrderedItem b i = OrderedItem
+  { orderedItemTodo :: Maybe Bool
+  , orderedItemTitle :: Sentences i
+  , orderedItemContents :: [b]
+  }
+  deriving (Eq, Show)
+
+data OrderType
+  = Numeral
   deriving (Eq, Show, Enum, Bounded)
 
 data Sentences i

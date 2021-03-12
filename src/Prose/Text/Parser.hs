@@ -220,19 +220,27 @@ pEnd = label "end of sentence" $ choice
 
 pBlocks :: Show b => Parser b i (NE.NonEmpty b)
 pBlocks = label "blocks" $
-  some (try $ many pEmptyLine *> pB)
+  some (try (many pEmptyLine *> pIndent) *> pB)
 
 -- | Parses a single block
 pBlock :: X b i => Parser b i (Block b i)
 pBlock = label "block" do
-  dbg "indent" pIndent
   choice
     [ comment
-    , para
+    , orderedItems
     , items
+    , para
     ]
 
  where
+  orderedItems = label "ordered items" $ choice
+    [ do
+        _ <- lookAhead pNumeralType
+        i <- pNumeralItem
+        is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pNumeralType) *> pNumeralItem)
+        return $ OrderedItems Numeral (i NE.:| is)
+    ]
+
   comment = label "comment" do
     t <- commentLine
     ts <- many (try (eol *> pIndent *> commentLine))
@@ -249,7 +257,7 @@ pBlock = label "block" do
 
   items = label "items" do
     i <- item
-    is <- label "more" $ many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> item)
+    is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> item)
     return $ Items (i NE.:| is)
 
   pItemType = label "an item ('-', '*', or '+')" $ choice
@@ -265,11 +273,24 @@ pBlock = label "block" do
       itemTitle <- pSentences
       dbg "empty" (eof <|> pEmptyLine)
       itemContents <- label "item content" $ choice
-        [ try $ do
-          NE.toList <$> pBlocks
+        [ NE.toList <$> pBlocks
         , pure []
         ]
       pure $ Item {..}
+
+  pNumeralType = try (takeWhile1P Nothing isNumber <* char ')') <* hspace1
+
+  pNumeralItem = label "numeral item" do
+    _ <- pNumeralType
+    let orderedItemTodo = Nothing
+    indent do
+      orderedItemTitle <- pSentences
+      dbg "empty" (eof <|> pEmptyLine)
+      orderedItemContents <- label "item content" $ choice
+        [ NE.toList <$> pBlocks
+        , pure []
+        ]
+      pure $ OrderedItem {..}
 
 -- Sections
 

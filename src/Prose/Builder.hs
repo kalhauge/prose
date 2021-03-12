@@ -178,8 +178,11 @@ instance Show Block' where
       showString "comment' " . shows (Text.intercalate "\n" txt)
     Para p -> showParen (n > app_prec) $
       showString "para' " . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder p)
-    Items it ->
+    Items it -> showParen (n > app_prec) $
       showString "items' " . showListWith showsItem (NE.toList it)
+    OrderedItems ot it -> showParen (n > app_prec) $
+      showString "ordered' " . shows ot
+      . showChar ' ' . showListWith showsOrderedItem (NE.toList it)
    where
     app_prec = 10
     showsItem = \case
@@ -187,9 +190,20 @@ instance Show Block' where
         showString "item' "
         . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder x)
         . showChar ' ' . shows b
-      Item Minus (Just b) _ _ ->
-        showString "todo " . shows b . showChar ' '
+      Item Minus (Just t) x b ->
+        showString "todo' " . shows t . showChar ' '
+        . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder x)
+        . showChar ' ' . shows b
       i -> shows i
+    showsOrderedItem (OrderedItem t x b) = case t of
+      Nothing ->
+        showString "oitem' "
+        . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder x)
+        . showChar ' ' . shows b
+      Just t' ->
+        showString "otodo' " . shows t' . showChar ' '
+        . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder x)
+        . showChar ' ' . shows b
 
 
 instance Show Inline' where
