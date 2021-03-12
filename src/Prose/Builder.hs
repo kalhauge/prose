@@ -235,6 +235,7 @@ showsQoutedSentences n (QoutedSentences qute x) =
  where
    app_prec = 10
    str = case qute of
+     Brackets -> "brackets' "
      Parenthesis -> "parens' "
      DoubleQoute -> "dqoute' "
      Emph -> "emph' "

@@ -193,6 +193,7 @@ pStartQoute = try $ do
     , string "*" $> Strong
     , char '/' $> Emph
     , char '(' $> Parenthesis
+    , char '[' $> Brackets
     ] -- <* notFollowedBy (endQoute <|> void pEnd)
   qoutes <- asks pCfgActiveQoutes
   if x `elem` qoutes
@@ -204,6 +205,7 @@ pStartQoute = try $ do
 
 pEndQoute :: Qoute -> Parser b i ()
 pEndQoute = \case
+  Brackets -> void $ label "end of bracket (])" (char ']')
   DoubleQoute -> void $ label "end of qoute (\")" (char '\"')
   Emph -> void . label "end of emph (/)" $ char '/'
   Strong -> void . label "end of strong (*)" $ char '*'

@@ -88,6 +88,7 @@ data QoutedSentences i = QoutedSentences
 
 data Qoute
   = DoubleQoute
+  | Brackets
   | Parenthesis
   | Emph
   | Strong

@@ -191,6 +191,7 @@ sQoutedSentences :: Serializer b i (QoutedSentences i)
 sQoutedSentences = over \(QoutedSentences qoute sens) ->
   let qouteit f t = f <> (sens >$ sSentences) <> t
   in case qoute of
+    Brackets -> qouteit "[" "]"
     DoubleQoute -> qouteit "\"" "\""
     Parenthesis -> qouteit "(" ")"
     Emph -> qouteit "/" "/"
