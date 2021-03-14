@@ -35,6 +35,9 @@ genConfig = GenerateConfig
   { allowedQoutes = [minBound .. maxBound]
   }
 
+generate :: ReaderT GenerateConfig m a -> m a
+generate ma = runReaderT ma genConfig
+
 genSimpleInline ::
   (MonadGen m, MonadReader GenerateConfig m)
   => m Inline'

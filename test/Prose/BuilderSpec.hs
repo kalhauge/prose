@@ -25,7 +25,7 @@ spec = do
         Block' (Comment ["hello", "world"])
 
     it "should build an itemized list" do
-      let i = item' (sb [ Comma ]) []
+      let i = item' (sb [ comma' ]) []
       items' [ i ]
         `shouldBe`
         Block' (Items ( i NE.:| []))
@@ -43,7 +43,7 @@ spec = do
         "comment' \"hello\\nworld\""
 
       para' (sb [ Word "hello", Word "super"]) `shouldShow`
-        "para' (sb [Word \"hello\",Word \"super\"])"
+        "para' (sb [word' \"hello\",word' \"super\"])"
 
     describe "sentence builder" do
       sb [comma'] <! [comma']

@@ -17,7 +17,7 @@ import Prose.DocSpec
 
 spec :: Spec
 spec = do
-  focus $ prop "should do something" do
+  prop "should do something" do
     i <- forAll $ runReaderT genSimpleSection genConfig
     let a = toPandoc i
     a === a

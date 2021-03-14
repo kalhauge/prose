@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 896840bfea0492a448acbc77bbdd88c71b435b42cbd7e283d9522a5c474e08b6
+-- hash: 463ffc7ba9cac170262323329b7354db0638aa4d197449f9ccd2e4909088ae41
 
 name:           prose
 version:        0.1.0.0
@@ -32,6 +32,8 @@ library
       Prose.Builder
       Prose.Builder.TH
       Prose.Doc
+      Prose.Extension.Article
+      Prose.Internal.Validation
       Prose.Pandoc
       Prose.Text.Parser
       Prose.Text.Serializer
@@ -84,6 +86,8 @@ test-suite prose-test
   other-modules:
       Prose.BuilderSpec
       Prose.DocSpec
+      Prose.Extension.ArticleSpec
+      Prose.Internal.ValidationSpec
       Prose.PandocSpec
       Prose.Text.MarkdownSpec
       Prose.Text.ParserSpec
