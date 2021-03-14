@@ -12,9 +12,9 @@ let
     else pkgs.haskell.packages."${compiler}";
 in
   haskellPackages.developPackage {
-    root = pkgs.lib.cleanSourceWith
-      { filter = path: type: baseNameOf path != ".nix";
-        src = pkgs.lib.cleanSource ./.;
+     root = pkgs.lib.cleanSourceWith
+      { filter = path: type: !(pkgs.lib.hasSuffix ".nix" path);
+        src = fix.hercules-ci.gitignoreSource ./.;
       };
     name = "prose";
     source-overrides = {

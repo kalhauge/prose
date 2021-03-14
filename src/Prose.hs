@@ -5,6 +5,7 @@ module Prose where
 -- base
 import System.IO (stdout, stderr, stdin)
 import Data.Foldable
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
 
 -- optparse
 import Options.Applicative
@@ -53,6 +54,7 @@ parseArgs = execParser $ info parseCommand mempty
 
 app :: IO ()
 app = do
+  setLocaleEncoding utf8
   parseArgs >>= \case
     Format mf -> do
       txt <- maybe (Text.hGetContents stdin) Text.readFile mf
