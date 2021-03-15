@@ -18,10 +18,9 @@ import SpecHelper
 
 spec :: Spec
 spec = do
-  return ()
-  -- prop "should convert to Doc" do
-  --   i <- forAll genArticle
-  --   tripping i toDoc fromDoc
+  prop "should convert to Doc" do
+    i <- forAll genArticle
+    tripping i toDoc fromDoc
 
 
 genArticle :: MonadGen m =>  m Article
@@ -36,7 +35,7 @@ genArticle = do
 genAuthor :: MonadGen m => m Author
 genAuthor = Author
   <$> Gen.element [ "Harry Potter", "Ron Weasley", "Hermione Granger" ]
-  <*> Gen.maybe (Gen.constant "Hogwards")
+  <*> Gen.constant Nothing -- Gen.maybe (Gen.constant "Hogwards")
 
 
 genLoremIpsum :: MonadGen m => m (Sentences Inline')

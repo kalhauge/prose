@@ -19,7 +19,7 @@ data Section s b i = Section
   { sectionTitle :: Sentences i
   , sectionContent :: [b]
   , sectionSubs :: [s]
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Ord)
 
 -- | A Block
 data Block b i
@@ -27,7 +27,7 @@ data Block b i
   | Comment [Text.Text]
   | Items (NE.NonEmpty (Item b i))
   | OrderedItems OrderType (NE.NonEmpty (OrderedItem b i))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Item b i = Item
   { itemType :: ItemType
@@ -35,31 +35,31 @@ data Item b i = Item
   , itemTitle :: Sentences i
   , itemContents :: [b]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data ItemType
   = Minus
   | Plus
   | Times
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Show, Enum, Bounded, Ord)
 
 data OrderedItem b i = OrderedItem
   { orderedItemTodo :: Maybe Bool
   , orderedItemTitle :: Sentences i
   , orderedItemContents :: [b]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data OrderType
   = Numeral
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Show, Enum, Bounded, Ord)
 
 data Sentences i
   = OpenSentence (NE.NonEmpty i)
   | ClosedSentence
       (Sentence i)
       (Maybe (Sentences i))
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Functor Sentences where
   fmap fn = \case
@@ -72,19 +72,19 @@ data Sentence i = Sentence
   { sentenceContent :: NE.NonEmpty i
   , sentenceEnd :: NE.NonEmpty End
   }
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Show, Functor, Ord)
 
 data End
   = Exclamation
   | Question
   | Period
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Show, Enum, Bounded, Ord)
 
 data QoutedSentences i = QoutedSentences
   { qoutedType :: Qoute
   , qoutedSentences :: Sentences i
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data Qoute
   = DoubleQoute
@@ -92,7 +92,7 @@ data Qoute
   | Parenthesis
   | Emph
   | Strong
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Show, Enum, Bounded, Ord)
 
 data Inline i
   = Word Text.Text
@@ -103,7 +103,7 @@ data Inline i
   | Verbatim Text.Text
   | Number Text.Text
   | Qouted (QoutedSentences i)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data DocAlgebra s b i a = DocAlgebra
   { onSections :: s -> a
@@ -129,6 +129,7 @@ countSentencesInQouted count (QoutedSentences _ s) =
   countSentences count s
 
 newtype ItemTree i = ItemTree (Item (ItemTree i) i)
+  deriving (Eq, Ord, Show)
 
 compressItem :: (b -> Maybe (NE.NonEmpty (Item b i))) -> Item b i -> Maybe (ItemTree i)
 compressItem fn Item {..} = ItemTree <$> do
@@ -154,15 +155,15 @@ type Doc = Section'
 
 newtype Section' = Section'
   { getSection :: Section Section' Block' Inline' }
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 newtype Block' = Block'
   { getBlock :: Block Block' Inline' }
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 newtype Inline' = Inline'
   { getInline :: Inline Inline' }
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 type Item' = Item Block' Inline'
 

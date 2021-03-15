@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5445fcbd29fbb4d1097dc1213dadf5873d99b64bff2065fbb8d6c21118b9877e
+-- hash: a3f17308a886e1c0900bed5764087bc71e7a693048567dd1a3509c24202d646c
 
 name:           prose
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       Prose.Builder.TH
       Prose.Doc
       Prose.Extension.Article
+      Prose.Internal.DocParser
       Prose.Internal.Validation
       Prose.Pandoc
       Prose.Text.Parser
@@ -55,7 +56,6 @@ library
     , prettyprinter >=1.2
     , template-haskell
     , text >=1.2
-    , with-utf8
   default-language: Haskell2010
 
 executable prose
@@ -79,7 +79,6 @@ executable prose
     , prose
     , template-haskell
     , text >=1.2
-    , with-utf8
   default-language: Haskell2010
 
 test-suite prose-test
@@ -124,5 +123,4 @@ test-suite prose-test
     , tasty-rerun
     , template-haskell
     , text >=1.2
-    , with-utf8
   default-language: Haskell2010

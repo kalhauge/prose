@@ -1,4 +1,9 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
@@ -48,8 +53,8 @@ instance Semigroup (Serializer b i a) where
 instance Monoid (Serializer b i a) where
   mempty = Serial \_ _ -> mempty
 
-serialize :: SerialConfig b i -> Serializer b i a -> a -> Text.Text
-serialize cfg s =
+serializeWith :: SerialConfig b i -> Serializer b i a -> a -> Text.Text
+serializeWith cfg s =
   LazyText.toStrict
   . Builder.toLazyText
   . runSerializer s cfg
@@ -270,4 +275,21 @@ simpleSerializeConfig = SerialConfig
   }
 
 runSimpleSerializer :: SimpleSerializer a -> a -> Text.Text
-runSimpleSerializer = serialize simpleSerializeConfig
+runSimpleSerializer = serializeWith simpleSerializeConfig
+
+class Serializable x where
+  serialize :: x -> Text.Text
+
+instance Serializable Inline' where
+  serialize = runSimpleSerializer sI
+
+instance Serializable Block' where
+  serialize = runSimpleSerializer sB
+
+instance Serializable Section' where
+  serialize = runSimpleSerializer sDoc
+
+instance Serializable (Sentences Inline') where
+  serialize = runSimpleSerializer sSentences
+
+
