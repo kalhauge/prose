@@ -25,7 +25,6 @@ import Control.Monad.Reader
 
 -- base
 import Unsafe.Coerce
-import Control.Monad
 import Data.Void
 import Control.Category
 import Data.Monoid
@@ -39,8 +38,27 @@ data Instance e = Instance
   { getSec :: Sec e
   , getBlk :: Blk e
   , getInl :: Inl e
-  , getSen :: forall b. Sen e b
+  , getClosedSen :: Sen e 'Closed
+  , getOpenSen :: Sen e 'Open
   }
+
+instance DocFunctor Instance where
+  mapDoc fn ins = Instance 
+    { getSec = overSec fn $ getSec ins
+    , getBlk = overBlk fn $ getBlk ins
+    , getInl = overInl fn $ getInl ins
+    , getClosedSen = overSen fn $ getClosedSen ins
+    , getOpenSen = overSen fn $ getOpenSen ins
+    }
+
+-- example :: forall e m. Monad m => m (AnySen e) -> AnySen (Monadic e m)
+-- example ma = AnySen $ fn
+--   where 
+--     fn :: forall b. MonadicSen e m b
+--     fn = MonadicSen $ do
+--       x <- ma
+--       case x of 
+--         AnySen v -> pure v
 
 -- | DocMaps is a function that can be run on a Document structure
 data e ~:> e' = DocMap
@@ -99,6 +117,14 @@ pureR = DocMap
 
 embedRM :: (Applicative m, EmbedableR e) => Unfix e ~:> Monadic e m
 embedRM = pureR . embedR 
+
+changeRM :: (forall a. m a -> m' a) -> Monadic e m ~:> Monadic e m'
+changeRM fn = DocMap
+  { overSec = fn
+  , overBlk = fn
+  , overInl = fn
+  , overSen = MonadicSen . fn . unMonadicSen
+  }
 
 type AnaR a = a ~:> Unfix a
 
@@ -307,12 +333,12 @@ data GeneratorM e m = GeneratorM
   , toSen :: m (AnySen e)
   } 
 
-toGeneratorM :: Value a ~:> Monadic e m -> GeneratorM e (ReaderT a m)
+toGeneratorM :: Monad m => Value a ~:> Monadic e m -> GeneratorM e (ReaderT a m)
 toGeneratorM DocMap {..} = GeneratorM
   { toSec = ReaderT overSec
   , toBlk = ReaderT overBlk
   , toInl = ReaderT overInl
-  , toSen = ReaderT (\a -> unMonadicSen (overSen (SenValue a)))
+  , toSen = ReaderT (\a -> AnySen <$> unMonadicSen (overSen (SenValue a)))
   }
 
 countSentences :: DocAlgebra (Value (Sum Int)) (Sum Int)

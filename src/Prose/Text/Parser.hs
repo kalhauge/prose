@@ -42,6 +42,8 @@ import Control.Monad.Combinators.NonEmpty
 
 import Prose.Doc
 import Prose.Builder ()
+import Prose.Simple
+import Prose.Recursion
 
 data ParserConfig b i = ParserConfig
   { pCfgParseB :: Parser b i b

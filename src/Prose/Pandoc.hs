@@ -15,6 +15,8 @@ import Data.Function
 import Data.List.NonEmpty qualified as NE
 
 import Prose.Doc
+import Prose.Recursion
+import Prose.Simple
 
 import Text.Pandoc.Builder qualified as PD
 -- import Text.Pandoc.Definition

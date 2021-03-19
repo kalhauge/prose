@@ -128,7 +128,7 @@ instance ShowR e => Show (Sentences e) where
   showsPrec n s =
     showParen (n > 10) $ showString "sen" . showsPrec 11 (toSentenceBuilder s)
 
-newtype AnySen e = AnySen { getAnySen :: forall b. Sen e b }
+data AnySen e = forall b. AnySen { getAnySen :: Sen e b }
 
 data Sentence e a where
   ClosedSentence   :: NE.NonEmpty (Inl e) -> NE.NonEmpty End -> Sentence e 'Closed 
@@ -177,7 +177,7 @@ data Mark
   = Comma
   | Colon
   | SemiColon
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Enum, Bounded)
 
 fromSentenceBuilder :: forall e. SentenceBuilder e -> Sentences e
 fromSentenceBuilder = \case

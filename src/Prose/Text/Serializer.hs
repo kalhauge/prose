@@ -16,12 +16,15 @@ import Data.List.NonEmpty qualified as NE
 import Data.Semigroup
 import Data.String
 
+
 -- text
 import Data.Text qualified as Text
 import Data.Text.Lazy qualified as LazyText
 import Data.Text.Lazy.Builder qualified as Builder
 
 import Prose.Doc
+import Prose.Simple
+import Prose.Recursion
 
 data SerialConfig b i = SerialConfig
   { sCfgInline :: Serializer b i i

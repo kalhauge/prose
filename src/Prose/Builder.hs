@@ -14,6 +14,7 @@ import qualified Data.Text as Text
 import qualified Data.List.NonEmpty as NE
 
 import Prose.Doc
+import Prose.Simple
 
 
 -- | Create a comment
