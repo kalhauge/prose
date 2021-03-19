@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -25,53 +26,116 @@ import qualified Hedgehog.Range as Range
 
 import SpecHelper
 import Prose.Doc
-
+import Prose.Recursion
+import Prose.Simple
 
 spec :: Spec
 spec = return ()
 
+generate :: (EmbedableR e, MonadGen m) => GeneratorM e m
+generate = generateR embedRM
 
-data Monadic e (m :: * -> *)
-
-newtype MonadicSen e (m :: * -> *) (b :: SenType) = MonadicSen 
-  { unMonadicSen :: m (Sen e b)
-  }
-
-instance DocR (Monadic e m) where
-  type Sec (Monadic e m) = m (Sec e) 
-  type Blk (Monadic e m) = m (Blk e) 
-  type Inl (Monadic e m) = m (Inl e) 
-  type Sen (Monadic e m) = MonadicSen e m
-
-
-generate :: forall a m. a ~ Value [Qoute] => a ~:> Monadic (Unfix a) m
-generate = DocMap {..}
+generateR :: forall e m. 
+  (MonadGen m, MonadReader [Qoute] m)
+  => Unfix e ~:> Monadic e m
+  -> GeneratorM e m 
+generateR embed = GeneratorM {..}
  where
-  overSec :: [Qoute] -> m (Section a)
-  overSec qoutes = do
-    sectionTitle <- overSentences []
-    sectionContent <- Gen.list (Range.linear 0 3) []
+  DocMap 
+    { overSec = oSec
+    , overBlk = oBlk
+    , overInl = oInl
+    , overSen = oSen
+    } = embed
+
+  toSec :: m (Sec e)
+  toSec = do
+    sectionTitle <- toSentences
+    sectionContent <- Gen.list (Range.linear 0 3) toBlk
     sectionSubs <- Gen.recursive Gen.choice
       [ pure [] ]
-      [ Gen.list (Range.singleton 1) [] 
-      , Gen.list (Range.singleton 2) []
-      , Gen.list (Range.singleton 3) []
+      [ Gen.list (Range.singleton 1) toSec 
+      , Gen.list (Range.singleton 2) toSec
+      , Gen.list (Range.singleton 3) toSec
       ]
-    return $ Section { .. }
+    oSec $ Section { .. }
 
-  -- overSentences qoutes = Gen.recursive Gen.choice
-  --   [ OpenSentences <$> Gen.nonEmpty (Range.linear 1 3) genI
-  --   , ClosedSentences <$> genSentence genI <*> pure Nothing
-  --   ]
-  --   [ Gen.subtermM (overSentences qoutes) \a -> do
-  --       sens <- genSentence genI
-  --       pure $ ClosedSentence sens (Just a)
-  --   ]
+  toBlk = Gen.recursive Gen.choice
+    [ Para 
+      <$> Gen.small toSentences
+    , Comment 
+      <$> Gen.list (Range.linear 1 3) (Gen.text (Range.linear 0 4) Gen.alphaNum)
+    ]
+    [ Items 
+      <$> Gen.nonEmpty (Range.linear 1 3) do
+        em <- Gen.enumBounded
+        sens <- Gen.small toSentences
+        blocks <- Gen.list (Range.linear 0 3) toBlk
+        return $ Item em Nothing sens blocks
+    , OrderedItems 
+      <$> Gen.enumBounded 
+      <*> Gen.nonEmpty (Range.linear 1 3) do
+        sens <- Gen.small toSentences
+        blocks <- Gen.list (Range.linear 0 3) toBlk
+        return $ OrderedItem Nothing sens blocks
+    ]
 
--- newtype GenerateConfig = GenerateConfig
---   { allowedQoutes :: [Qoute]
---   }
--- 
+  toInl = do
+    qoutes <- ask
+    oInl =<< Gen.recursive Gen.choice
+      [ Mark <$> Gen.enumBounded
+      , do
+          c <- Gen.alpha
+          word <- Gen.text (Range.linear 0 32) $
+            Gen.choice
+            [ Gen.alphaNum
+            , Gen.element ['-', '\'', '$']
+            ]
+          pure . Word $ Text.cons c word
+      , do
+          c <- Gen.alpha
+          word <- Gen.text (Range.linear 0 32) Gen.alphaNum
+          x <- Gen.maybe (Gen.constant ".")
+          pure $ Word (Text.cons c word <> fold x)
+      , do
+          word <- Gen.text (Range.linear 0 32) Gen.alphaNum
+          pure $ Verbatim word
+      , do
+          n <- Gen.int (Range.linear 1 32)
+          number <- Gen.text (Range.linear 1 n) Gen.digit
+          pure $ Number number
+      ]
+      [ Qouted <$> toQoutedSentences qoute | qoute <- qoutes ]
+
+
+  toQoutedSentences qoute = do
+    sentences <- local (delete qoute) toSentences
+    pure $ QoutedSentences qoute sentences
+
+  toSentences = Gen.recursive Gen.choice
+    [ OpenSentences <$> Gen.nonEmpty (Range.linear 1 3) toInl
+    , ClosedSentences <$> toSen <*> pure Nothing
+    ]
+    [ Gen.subtermM toSentences \a -> do
+        sens <- toSen 
+        pure $ ClosedSentence sens (Just a)
+    ]
+
+  toSen :: m (MonadicSen m e)
+  toSen = oSen =<< Gen.choice 
+    [ ClosedSentence 
+      <$> Gen.nonEmpty (Range.linear 1 10) toInl
+    , OpenSentence
+      <$> Gen.nonEmpty (Range.linear 1 10) toInl
+      <*> Gen.nonEmpty (Range.linear 1 3) Gen.enumBounded
+    ]
+
+
+
+--newtype GenerateConfig = GenerateConfig
+--  { allowedQoutes :: [Qoute]
+--  }
+
 -- genConfig :: GenerateConfig
 -- genConfig = GenerateConfig
 --   { allowedQoutes = [minBound .. maxBound]
@@ -86,44 +150,8 @@ generate = DocMap {..}
 -- genSimpleInline =
 --   Inline' <$> genInline genSimpleInline
 -- 
--- genInline :: (MonadGen m, MonadReader GenerateConfig m) => m i -> m (Inline i)
--- genInline genI = do
---   qoutes <- asks allowedQoutes
---   Gen.recursive Gen.choice
---     [ Gen.element [Comma, Colon]
---     , do
---         c <- Gen.alpha
---         word <- Gen.text (Range.linear 0 32) $
---           Gen.choice
---           [ Gen.alphaNum
---           , Gen.element ['-', '\'', '$']
---           ]
---         pure . Word $ Text.cons c word
---     , do
---         c <- Gen.alpha
---         word <- Gen.text (Range.linear 0 32) Gen.alphaNum
---         x <- Gen.maybe (Gen.constant ".")
---         pure $ Word (Text.cons c word <> fold x)
---     , do
---         word <- Gen.text (Range.linear 0 32) Gen.alphaNum
---         pure $ Verbatim word
---     , do
---         n <- Gen.int (Range.linear 1 32)
---         number <- Gen.text (Range.linear 1 n) Gen.digit
---         pure $ Number number
---     ]
---     [ Qouted <$> genQoutedSentences qoute genI | qoute <- qoutes ]
 -- 
--- genQoutedSentences :: (MonadGen m, MonadReader GenerateConfig m) => Qoute -> m i -> m (QoutedSentences i)
--- genQoutedSentences qoute genI = do
---   sentences <- local (\a -> a { allowedQoutes =  delete qoute (allowedQoutes a)})
---     (genSentences genI)
---   pure $ QoutedSentences qoute sentences
 -- 
--- genSentence :: (MonadGen m, MonadReader GenerateConfig m) => m i -> m (Sentence i)
--- genSentence genI = Sentence
---   <$> Gen.nonEmpty (Range.linear 1 10) genI
---   <*> Gen.nonEmpty (Range.linear 1 3) Gen.enumBounded
 -- 
 -- genSentences :: (MonadGen m, MonadReader GenerateConfig m) => m i -> m (Sentences i)
 -- genSentences genI = Gen.recursive Gen.choice
@@ -138,21 +166,6 @@ generate = DocMap {..}
 -- genSimpleBlock :: (MonadGen m, MonadReader GenerateConfig m) => m Block'
 -- genSimpleBlock = Block' <$> genBlock genSimpleBlock genSimpleInline
 -- 
--- genBlock :: (MonadGen m, MonadReader GenerateConfig m) => m b -> m i -> m (Block b i)
--- genBlock mb mi = Gen.recursive Gen.choice
---   [ Para <$> Gen.small (genSentences mi)
---   , Comment <$> Gen.list (Range.linear 1 3) (Gen.text (Range.linear 0 4) Gen.alphaNum)
---   ]
---   [ Items <$> Gen.nonEmpty (Range.linear 1 3) do
---       em <- Gen.enumBounded
---       sens <- Gen.small(genSentences mi)
---       blocks <- Gen.list (Range.linear 0 3) mb
---       return $ Item em Nothing sens blocks
---   , OrderedItems <$> Gen.enumBounded <*> Gen.nonEmpty (Range.linear 1 3) do
---       sens <- Gen.small (genSentences mi)
---       blocks <- Gen.list (Range.linear 0 3) mb
---       return $ OrderedItem Nothing sens blocks
---   ]
 -- 
 -- genSingeWordSentence ::
 --   (MonadGen m, MonadReader GenerateConfig m)
