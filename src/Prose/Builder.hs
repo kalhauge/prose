@@ -1,4 +1,5 @@
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-|
@@ -14,8 +15,9 @@ import qualified Data.List.NonEmpty as NE
 
 import Prose.Doc
 
+
 -- | Create a comment
-comment :: Text.Text -> Block b i
+comment :: Text.Text -> Block e
 comment = Comment . Text.lines
 
 -- | Create a simple comment
@@ -23,15 +25,15 @@ comment' :: Text.Text -> Block'
 comment' = Block' . comment
 
 -- | Create a paragraph
-para :: Sentences i -> Block b i
+para :: Sentences e -> Block e
 para = Para
 
 -- | Create a paragraph
-para' :: SentenceBuilder (Inline Inline') -> Block'
-para' = Block' . para . sen'
+para' :: SentenceBuilder Simple -> Block'
+para' = Block' . para . fromSentenceBuilder
 
 -- | Itemized List, fails if the list is empty
-items' :: [Item Block' Inline'] -> Block'
+items' :: [Item Simple] -> Block'
 items' = maybe (error "list is empty") safeItems' . NE.nonEmpty
 
 -- | Itemized List
@@ -40,75 +42,64 @@ safeItems' =  Block' . Items
 
 -- | A List Item
 item' ::
-  SentenceBuilder Inline'
-  -> [Block']
-  -> Item'
-item' = Item Minus Nothing . sen
+  SentenceBuilder e
+  -> [Blk e]
+  -> Item e
+item' = Item Minus Nothing . fromSentenceBuilder
 
 -- | A List Todo
 todo ::
   Bool -- ^ Is it done?
-  -> Sentences Inline'
-  -> Item'
+  -> Sentences e
+  -> Item e
 todo b s = Item Minus (Just b) s []
 
-withItemType :: Item b i -> ItemType -> Item b i
-withItemType i it = i { itemType = it }
-
-withContent :: Item b i -> [ b ] -> Item b i
-withContent i blks = i { itemContents = blks }
-
-withItems' :: Item' -> [ Item' ] -> Item'
-withItems' i itms = i `withContent` [ items' itms ]
-
-
-sen' :: SentenceBuilder (Inline Inline') -> Sentences Inline'
-sen' sbs = Inline' <$> sen sbs
-
-sb :: [i] -> SentenceBuilder i
+sb :: [Inl Simple] -> SentenceBuilder Simple
 sb i = case NE.nonEmpty i of
-  Just i' -> Current i' []
+  Just i' -> Current (OpenSentence i') []
   Nothing -> error "list should be non-empty"
 
-(<.) :: SentenceBuilder i -> [i] -> SentenceBuilder i
-(<.) = endWith Period
-
-(<!) :: SentenceBuilder i -> [i] -> SentenceBuilder i
-(<!) = endWith Exclamation
-
-(<?) :: SentenceBuilder i -> [i] -> SentenceBuilder i
-(<?) = endWith Question
-
-endWith :: End -> SentenceBuilder i -> [i] -> SentenceBuilder i
-endWith end sbs is = case sbs of
-  Current ne rest -> case NE.nonEmpty is of
-    Just xs -> Current xs $ Sentence ne (end NE.:| []) : rest
-    Nothing -> AllClosed $ Sentence ne (end NE.:| []) NE.:| rest
-  AllClosed (Sentence ne ends NE.:| rest) -> case NE.nonEmpty is of
-    Just xs -> Current xs $ Sentence ne (end NE.<| ends) : rest
-    Nothing -> AllClosed $ Sentence ne (end NE.<| ends) NE.:| rest
-
-comma :: Inline i
-comma = Comma
+-- (<.) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
+-- (<.) = endWith Period
+-- 
+-- (<!) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
+-- (<!) = endWith Exclamation
+-- 
+-- (<?) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
+-- (<?) = endWith Question
+-- 
+-- endWith :: End -> SentenceBuilder e -> [Inl e] -> SentenceBuilder e
+-- endWith end sbs is = case sbs of
+--   Current ne rest -> case NE.nonEmpty is of
+--     Just xs -> 
+--       Current (sen $ OpenSentence xs) 
+--       $ sen (ClosedSentence ne (end NE.:| []) : rest)
+--     Nothing -> 
+--       AllClosed 
+--       $ ClosedSentence ne (end NE.:| []) NE.:| rest
+--   AllClosed (ClosedSentence ne ends NE.:| rest) -> case NE.nonEmpty is of
+--     Just xs -> 
+--       Current xs 
+--       $ Sentence ne (end NE.<| ends) : rest
+--     Nothing -> 
+--       AllClosed 
+--       $ Sentence ne (end NE.<| ends) NE.:| rest
 
 comma' :: Inline'
-comma' = Inline' comma
+comma' = Inline' $ Mark Comma
 
 colon' :: Inline'
-colon' = Inline' Colon
+colon' = Inline' $ Mark Colon
 
 semicolon' :: Inline'
-semicolon' = Inline' SemiColon
-
-word :: Text.Text -> Inline i
-word = Word
+semicolon' = Inline' $ Mark SemiColon
 
 word' :: Text.Text -> Inline'
-word' = Inline' . word
-
-number :: Text.Text -> Inline i
-number = Number
+word' = Inline' . Word
 
 number' :: Text.Text -> Inline'
-number' = Inline' . number
+number' = Inline' . Number
+
+verbatim' :: Text.Text -> Inline'
+verbatim' = Inline' . Verbatim
 

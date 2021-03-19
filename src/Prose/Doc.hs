@@ -2,6 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingVia #-}
@@ -26,7 +27,6 @@ import Unsafe.Coerce
 
 import Text.Show
 import Data.Void
-import Debug.Trace
 import Data.Monoid
 import Data.Foldable
 import Prelude hiding (Word)
@@ -173,18 +173,31 @@ data Qoute
   deriving (Eq, Show, Enum, Bounded, Ord)
 
 data Inline e
-  = Word Text.Text
-  | Reference Text.Text
-  | Comma
-  | Colon
-  | SemiColon
-  | Verbatim Text.Text
-  | Number Text.Text
+  = Word !Text.Text
+  | Reference !Text.Text
+  | Mark !Mark
+  | Verbatim !Text.Text
+  | Number !Text.Text
   | Qouted (QoutedSentences e)
 
 deriving instance EqR e => Eq (Inline e)
 deriving instance OrdR e => Ord (Inline e)
 deriving instance ShowR e => Show (Inline e)
+
+data Mark 
+  = Comma
+  | Colon
+  | SemiColon
+  deriving (Eq, Show, Ord)
+
+
+-- | DocMaps is a function that can be run on a Document structure
+data e ~:> e' = DocMap
+  { overSec :: Sec e -> Sec e'
+  , overBlk :: Blk e -> Blk e'
+  , overInl :: Inl e -> Inl e'
+  , overSen :: forall b. Sen e b -> Sen e' b
+  }
 
 
 -- Algebra
@@ -198,64 +211,68 @@ instance DocR (Unfix e) where
   type Inl (Unfix e) = Inline e
   type Sen (Unfix e) = Sentence e
 
-data DocAlgebraR e a = DocAlgebraR
-  { fromSec :: Sec e -> a
-  , fromBlk :: Blk e -> a
-  , fromInl :: Inl e -> a
-  , fromSen :: forall b. Sen e b -> a
-  } deriving (Functor) 
+class DocR e => ProjectableR e where
+  projectR :: e ~:> (Unfix e)
 
-data Extractor e e' = Extractor
-  { overSec :: Sec e -> Sec e'
-  , overBlk :: Blk e -> Blk e'
-  , overInl :: Inl e -> Inl e'
-  , overSen :: forall b. Sen e b -> Sen e' b
-  }
 
-class DocMap f where
-  mapDoc :: Extractor e e' -> f e -> f e'
+class DocFunctor f where
+  mapDoc :: e ~:> e' -> f e -> f e'
 
-instance DocMap Section where
+instance DocFunctor Section where
   mapDoc e Section {..} = Section 
     (mapDoc e sectionTitle)
     (overBlk e <$> sectionContent)
     (overSec e <$> sectionSubs)
 
-instance DocMap Sentences where
+instance DocFunctor Sentences where
   mapDoc e = \case
     OpenSentences a -> 
       OpenSentences (overSen e a)
     ClosedSentences a b -> 
       ClosedSentences (overSen e a) (mapDoc e <$> b)
 
-instance DocMap Block where
+instance DocFunctor Block where
   mapDoc e = \case 
     Para a -> Para (mapDoc e a)
 
-instance DocMap Inline where
+instance DocFunctor Inline where
   mapDoc e = \case
     Qouted (QoutedSentences a b) 
       -> Qouted (QoutedSentences a (mapDoc e b))
     a -> unsafeCoerce a 
 
-instance DocMap Item where
+instance DocFunctor QoutedSentences where
+  mapDoc e (QoutedSentences {..}) = QoutedSentences 
+    { qoutedSentences = mapDoc e qoutedSentences
+    , ..
+    }
+
+instance DocFunctor Item where
   mapDoc e Item {..} = Item 
     { itemTitle = mapDoc e itemTitle
     , itemContents = overBlk e <$> itemContents  
     , ..
     }
 
-instance DocMap OrderedItem where
+instance DocFunctor OrderedItem where
   mapDoc e OrderedItem {..} = OrderedItem
     { orderedItemTitle = mapDoc e orderedItemTitle
     , orderedItemContents = overBlk e <$> orderedItemContents 
     , ..
     }
 
-mapDocSen :: Extractor e e' -> Sentence e a -> Sentence e' a
+mapDocSen :: e ~:> e' -> Sentence e a -> Sentence e' a
 mapDocSen e = \case
   OpenSentence ins -> OpenSentence (overInl e <$> ins)
   ClosedSentence ins ends -> ClosedSentence (overInl e <$> ins) ends
+
+
+data Extractor e a = Extractor
+  { fromSec :: Sec e -> a
+  , fromBlk :: Blk e -> a
+  , fromInl :: Inl e -> a
+  , fromSen :: forall b. Sen e b -> a
+  } deriving (Functor) 
 
 data Value a
 newtype SenValue a (b :: SenType) = 
@@ -265,7 +282,7 @@ instance DocR (Value a) where
   type Sec (Value a) = a
   type Blk (Value a) = a
   type Inl (Value a) = a
-  type Sen (Value a) = SenValue a
+  type Sen (Value a) = a
 
 data DocAlgebra e a = DocAlgebra
   { fromSection :: Section e -> a
@@ -273,19 +290,29 @@ data DocAlgebra e a = DocAlgebra
   , fromInline :: Inline e -> a
   , fromItem :: Item e -> a
   , fromOrderedItem :: OrderedItem e -> a
+  , fromQoutedSentences :: QoutedSentences e -> a
   , fromSentences :: Sentences e -> a
   , fromSentence :: forall b. Sentence e b -> a
   } deriving (Functor)
 
-contraMapAlgebra :: DocR e => Extractor e e' -> DocAlgebra e' a -> DocAlgebra e a
-contraMapAlgebra e DocAlgebra {..} = DocAlgebra
+contramapAlgebra :: e ~:> e' -> DocAlgebra e' a -> DocAlgebra e a
+contramapAlgebra e DocAlgebra {..} = DocAlgebra
   { fromSection = fromSection . mapDoc e
   , fromBlock = fromBlock . mapDoc e
   , fromInline = fromInline . mapDoc e
   , fromItem = fromItem . mapDoc e
   , fromOrderedItem = fromOrderedItem . mapDoc e
+  , fromQoutedSentences = fromQoutedSentences . mapDoc e
   , fromSentences = fromSentences . mapDoc e
   , fromSentence = fromSentence . mapDocSen e
+  }
+
+contramapExtractor :: forall e e' a. e ~:> e' -> Extractor e' a -> Extractor e a
+contramapExtractor fn Extractor {..} = Extractor
+  { fromSec = fromSec . overSec fn 
+  , fromBlk = fromBlk . overBlk fn
+  , fromInl = fromInl . overInl fn
+  , fromSen = fromSen . overSen fn
   }
 
 -- | A default fold, should be overloaded
@@ -314,9 +341,11 @@ foldDoc = DocAlgebra {..}
     <> fold orderedItemContents
 
   fromInline = \case
-    Qouted (QoutedSentences _ sen) -> 
-      fromSentences sen
+    Qouted a -> fromQoutedSentences a
     _ -> mempty
+
+  fromQoutedSentences QoutedSentences {..} =
+    fromSentences qoutedSentences
 
   fromSentences = \case
     OpenSentences (SenValue sen) -> sen
@@ -327,26 +356,26 @@ foldDoc = DocAlgebra {..}
     OpenSentence wrds -> fold wrds
     ClosedSentence wrds end -> fold wrds
 
-cata :: forall e a. Extractor e (Unfix e) -> DocAlgebra (Value a) a -> Extractor e (Value a)
-cata project da = extract
+cata :: forall e a. ProjectableR e => Unfix a ~:> a -> e ~:> a 
+cata da = extract
  where 
-  extract = Extractor 
-    { overSec = fromSection da . mapDoc extract . overSec project
-    , overBlk = fromBlock da . mapDoc extract . overBlk project
-    , overInl = fromInline da . mapDoc extract . overInl project
-    , overSen = SenValue . fromSentence da . mapDocSen extract . overSen project
+  extract = DocMap
+    { overSec = overSec da . mapDoc extract . overSec projectR
+    , overBlk = overBlk da . mapDoc extract . overBlk projectR
+    , overInl = overInl da . mapDoc extract . overInl projectR
+    , overSen = overSen da . mapDocSen extract . overSen projectR
     }
 
-unsimplify :: Extractor Simple (Unfix Simple)
-unsimplify = Extractor
-  { overSec = \(Section' sec) -> sec
-  , overBlk = \(Block' blk) -> blk
-  , overInl = \(Inline' inl) -> inl
-  , overSen = id
+fromAlgebra :: DocAlgebra e a -> Unfix e ~:> Value a
+fromAlgebra pj = DocMap
+  { overSec = fromSection pj
+  , overBlk = fromBlock pj
+  , overInl = fromInline pj
+  , overSen = SenValue . fromSentence pj
   }
 
-toAlgebra :: Extractor e (Value a) -> DocAlgebraR e a
-toAlgebra Extractor {..} = DocAlgebraR
+toAlgebra :: e ~:> Value a -> Extractor e a
+toAlgebra DocMap {..} = Extractor
   { fromSec = overSec
   , fromBlk = overBlk
   , fromInl = overInl
@@ -356,10 +385,6 @@ toAlgebra Extractor {..} = DocAlgebraR
 countSentences :: DocAlgebra (Value (Sum Int)) (Sum Int)
 countSentences = foldDoc { fromSentence = const 1 }
 
-countSimpleSentences :: DocAlgebraR Simple Int
-countSimpleSentences = 
-  getSum <$> toAlgebra (cata unsimplify countSentences)
-
 countWords :: DocAlgebra (Value (Sum Int)) (Sum Int)
 countWords = fd { fromInline = \case
     Word _ -> 1
@@ -368,40 +393,6 @@ countWords = fd { fromInline = \case
     a -> fromInline fd a
   }
  where fd = foldDoc
-
-countSimpleWords :: DocAlgebraR Simple Int
-countSimpleWords = 
-  getSum <$> toAlgebra (cata unsimplify countWords)
-
--- simplify :: forall a. DocAlgebra a -> Extractor Simple (DAlgebra a)
--- simplify a = DocAlgebra {..}
---  where 
---   fromSec (Section' sec) = fromSection a sec
---   fromBlk (Block' blk) = fromBlock a blk
---   fromInl (Inline' inl) = fromInline a inl
---   fromSen :: forall b. Sentence Simple b -> a
---   fromSen sen = fromSentence a sen
--- 
--- countSimpleSentences :: Extractor Simple (DAlgebra Int)
--- countSimpleSentences = getSum <$> result
---   where result = simplify (countSentences result)
-
--- countSentencesInInline :: Inline' -> Int
--- countSentencesInInline (Inline' inline) = case inline of
---   Qouted q -> countSentencesInQouted countSentencesInInline q
---   _ -> 0
--- 
--- countSentences :: (i -> Int) -> Sentences i -> Int
--- countSentences cnt = \case
---   OpenSentence x ->
---     1 + sum (fmap cnt x)
---   ClosedSentence (Sentence is _) rest ->
---     1 + sum (fmap cnt is) + maybe 0 (countSentences cnt) rest
--- 
--- 
--- countSentencesInQouted :: (i -> Int) -> QoutedSentences i -> Int
--- countSentencesInQouted count (QoutedSentences _ s) =
---   countSentences count s
 
 -- newtype ItemTree i = ItemTree (Item (ItemTree i, i))
 -- 
@@ -447,20 +438,29 @@ type Doc = Section'
 
 newtype Section' = Section'
   { getSection :: Section Simple }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Section' where
+  showsPrec = flip $ fromSec showSimple
 
 newtype Block' = Block'
   { getBlock :: Block Simple }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Block' where
+  showsPrec = flip $ fromBlk showSimple
 
 newtype Inline' = Inline'
   { getInline :: Inline Simple }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Inline' where
+  showsPrec = flip $ fromInl showSimple
 
 type Item' = Item Simple
 
-sen :: forall e. SentenceBuilder e -> Sentences e
-sen = \case
+fromSentenceBuilder :: forall e. SentenceBuilder e -> Sentences e
+fromSentenceBuilder = \case
   Current ne lst ->
     case NE.nonEmpty lst of
       Just x -> go (Just $ OpenSentences ne) x
@@ -490,6 +490,79 @@ data SentenceBuilder e =
 deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
 deriving instance ShowR e => Show (SentenceBuilder e)
+
+instance ProjectableR Simple where
+  projectR = DocMap
+    { overSec = \(Section' sec) -> sec
+    , overBlk = \(Block' blk) -> blk
+    , overInl = \(Inline' inl) -> inl
+    , overSen = id
+    }
+
+countSimpleSentences :: Extractor Simple Int
+countSimpleSentences = 
+  getSum <$> toAlgebra (cata (fromAlgebra countSentences))
+
+countSimpleWords :: Extractor Simple Int
+countSimpleWords = 
+  getSum <$> toAlgebra (cata (fromAlgebra countWords))
+
+
+-- instance Show Section' where
+--   showsPrec n (Section' s) =
+--     showParen (n > app_prec) (showString "Section' " . showsPrec (app_prec + 1) s)
+--    where app_prec = 10
+
+-- | A default fold, should be overloaded
+showDoc :: DocAlgebra (Value (Int -> ShowS)) (Int -> ShowS)
+showDoc = DocAlgebra {..}
+ where
+  fromSection Section {..} n = 
+    showParen (n > app_prec) 
+    $ showString "sec' " 
+    . fromSentences sectionTitle (app_prec + 1) 
+    . showChar ' ' . showListWith ($ 0) sectionContent
+    . showChar ' ' . showListWith ($ 0) sectionSubs
+
+  fromBlock blk = const $ shows ()
+    -- case blk of
+    --   Para s -> 
+    --     showParen (n > app_prec) 
+    --     . showString "para'"
+    --   Comment _ -> mempty
+    --   Items its -> 
+    --     foldMap fromItem its
+    --   OrderedItems _ its -> 
+    --     foldMap fromOrderedItem its
+
+  fromItem Item {..} = const $ shows ()
+    -- fromSentences itemTitle 
+    -- <> fold itemContents
+
+  fromOrderedItem OrderedItem {..} = const $ shows ()
+    -- fromSentences orderedItemTitle
+    -- <> fold orderedItemContents
+
+  fromInline i n = showParen (n > app_prec) $ case i of
+    Word w -> showString "word' " . shows w
+    Qouted q -> fromQoutedSentences q i
+
+
+  fromQoutedSentences q = const $ shows ()
+
+  fromSentences sens = const $ shows ()
+
+  -- \case
+  --   OpenSentences (SenValue sen) -> sen
+  --   ClosedSentences (SenValue sen) rest -> sen <> foldMap fromSentences rest
+
+  -- fromSentence :: forall b. Sentence (Value m) b -> m
+  fromSentence sen = const $ shows ()
+
+  app_prec = 10
+
+showSimple :: Extractor Simple (Int -> ShowS)
+showSimple = toAlgebra (cata (fromAlgebra showDoc))
 
 -- instance ShowR e => Show (SentenceBuilder e) where
 --   showsPrec n = showParen (n > app_prec) . \case
