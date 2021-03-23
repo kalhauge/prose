@@ -21,10 +21,10 @@
 module Prose.Doc where
 
 -- base
-import GHC.Generics (Generic)
-import Text.Show
-import Prelude hiding (Word)
 import Data.List.NonEmpty qualified as NE
+import Data.Void
+import GHC.Generics (Generic)
+import Prelude hiding (Word)
 
 -- text
 import Data.Text qualified as Text
@@ -36,15 +36,15 @@ class DocR e where
   type Sec e :: *
   type Blk e :: *
   type Inl e :: *
-  type Sen e :: SenType -> *
+  type Sen (b :: SenType) e :: *
 
 class 
   ( DocR e
   , Show (Sec e)
   , Show (Blk e)
   , Show (Inl e)
-  , Show (Sen e 'Open)
-  , Show (Sen e 'Closed)
+  , Show (Sen 'Open e)
+  , Show (Sen 'Closed e)
   ) => ShowR e where
 
 class 
@@ -52,16 +52,16 @@ class
   , Eq (Sec e)
   , Eq (Blk e)
   , Eq (Inl e)
-  , Eq (Sen e 'Open)
-  , Eq (Sen e 'Closed)
+  , Eq (Sen 'Open e)
+  , Eq (Sen 'Closed e)
   ) => EqR e where
 class 
   ( EqR e
   , Ord (Sec e)
   , Ord (Blk e)
   , Ord (Inl e)
-  , Ord (Sen e 'Open)
-  , Ord (Sen e 'Closed)
+  , Ord (Sen 'Open e)
+  , Ord (Sen 'Closed e)
   ) => OrdR e where
 
 -- | A Section
@@ -118,8 +118,8 @@ data OrderType
   deriving (Eq, Show, Enum, Bounded, Ord)
 
 data Sentences e
-  = OpenSentences (Sen e 'Open)
-  | ClosedSentences (Sen e 'Closed) (Maybe (Sentences e))
+  = OpenSentences (Sen 'Open e)
+  | ClosedSentences (Sen 'Closed e) (Maybe (Sentences e))
 
 deriving instance EqR e => Eq (Sentences e)
 deriving instance OrdR e => Ord (Sentences e)
@@ -188,7 +188,7 @@ fromSentenceBuilder = \case
   AllClosed rest ->
     go Nothing rest
  where
-  go :: Maybe (Sentences e) -> NE.NonEmpty (Sen e 'Closed) -> Sentences e
+  go :: Maybe (Sentences e) -> NE.NonEmpty (Sen 'Closed e) -> Sentences e
   go x (s NE.:| ss) = case NE.nonEmpty ss of
     Nothing -> ClosedSentences s x
     Just rst-> go (Just $ ClosedSentences s x) rst
@@ -204,10 +204,21 @@ toSentenceBuilder = go []
 
 
 data SentenceBuilder e =
-  Current (Sen e 'Open) [Sen e 'Closed]
-  | AllClosed (NE.NonEmpty (Sen e 'Closed))
+  Current (Sen 'Open e) [Sen 'Closed e]
+  | AllClosed (NE.NonEmpty (Sen 'Closed e))
 
 deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
 deriving instance ShowR e => Show (SentenceBuilder e)
+
+-- | An Item tree.
+newtype ItemTree e = ItemTree
+  { itemTree :: Item (ItemTree e)
+  }
+
+instance DocR (ItemTree e) where
+  type Sec (ItemTree e) = Void
+  type Blk (ItemTree e) = ItemTree e
+  type Inl (ItemTree e) = Inl e
+  type Sen b (ItemTree e) = Sen b e
 

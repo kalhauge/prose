@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -33,6 +34,7 @@ import Hedgehog.Range qualified as Range
 
 import SpecHelper
 import Prose.DocSpec
+import Prose.Recursion
 
 spec :: SpecWith ()
 spec = do
@@ -141,19 +143,15 @@ specSection = describe "section" do
       Right d ->
         runSimpleSerializer sDoc d `shouldBe` txt2
 
-contrmap :: t0 -> Serializer b i (Section s b i) -> Serializer b i s
-contrmap = error "not implemented"
-
-
 serializeRoundtrip ::
-  (Show i, Eq i)
-  => GenT Identity i
-  -> SimpleSerializer i
-  -> SimpleParser i
+  (Show x, Eq x)
+  => Gen x
+  -> (x -> Serialized)
+  -> Parser x
   -> Spec
 serializeRoundtrip gen s p = prop "can serialize and parse" do
   i <- forAll gen
-  let txt = runSimpleSerializer s i
+  let txt = s i
   annotate (Text.unpack txt)
   case runSimpleParser (p <* eof) txt of
     Left err -> do
@@ -164,9 +162,9 @@ serializeRoundtrip gen s p = prop "can serialize and parse" do
 
 myTripping ::
   (Show i, Eq i)
-  => GenT Identity i
-  -> SimpleSerializer i
-  -> SimpleParser i
+  => Gen i
+  -> (e ~:> Value Text.Text)
+  -> Parser i
   -> Spec
 myTripping gen s p = prop "can serialize and parse" do
   i <- forAll gen
@@ -201,7 +199,7 @@ onFile :: FilePath -> (Text.Text -> SpecWith ()) -> SpecWith ()
 onFile file k = describe file do
   k =<< runIO (Text.readFile file)
 
-parseOrFail :: SimpleParser i -> Text.Text -> (i -> IO ()) -> IO ()
-parseOrFail p txt run = case runSimpleParser p txt of
-  Left err -> expectationFailure (errorBundlePretty err)
-  Right d -> run d
+-- parseOrFail :: SimpleParser i -> Text.Text -> (i -> IO ()) -> IO ()
+-- parseOrFail p txt run = case runSimpleParser p txt of
+--   Left err -> expectationFailure (errorBundlePretty err)
+--   Right d -> run d

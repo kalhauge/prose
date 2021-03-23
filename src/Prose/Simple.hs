@@ -70,9 +70,6 @@ instance EmbedableR Simple where
     , overSen = id
     }
 
-
-
-
 countSimpleSentences :: Extractor Simple Int
 countSimpleSentences = 
   getSum <$> toExtractor (cata (fromAlgebra countSentences))
@@ -109,7 +106,7 @@ showDoc = DocAlgebra {..}
     --   OrderedItems _ its -> 
     --     foldMap fromOrderedItem its
 
-  fromItem Item {..} = const $ shows ()
+  fromItem Item {} = const $ shows ()
     -- fromSentences itemTitle 
     -- <> fold itemContents
 

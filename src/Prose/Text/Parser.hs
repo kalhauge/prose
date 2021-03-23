@@ -24,7 +24,6 @@ import Control.Monad.Reader
 import Data.Void
 import Data.Maybe
 import Data.Functor
-import Control.Applicative (Alternative)
 import Data.List qualified as L
 import Data.List.NonEmpty qualified as NE
 import Data.Char hiding (Space)
@@ -43,8 +42,9 @@ import Control.Monad.Combinators.NonEmpty
 
 import Prose.Doc
 import Prose.Builder ()
-import Prose.Simple
 import Prose.Recursion
+
+type Parser = Parsec Void Text.Text
 
 data ParserConfig = ParserConfig
   { pCfgActiveQoutes :: [Qoute]
@@ -61,7 +61,7 @@ defaultParserConfig = ParserConfig
   , pCfgDepth = Nothing
   }
 
-type P = ReaderT ParserConfig (Parsec Void Text.Text)
+type P = ReaderT ParserConfig Parser
 
 label :: Show a => String -> P a -> P a
 label name =
@@ -85,15 +85,18 @@ pushActiveQoute qoute =
   local (\a -> a { pCfgActiveQoutes = qoute:pCfgActiveQoutes a })
 
 
-defaultParser :: (ShowR e, EmbedableR e) => Instance (Monadic e (Parsec Void Text.Text))
-defaultParser = mapDoc (changeRM (flip runReaderT defaultParserConfig)) (parser embedRM)
+defaultParser :: 
+  (ShowR e, EmbedableR e) 
+  => InstanceM e Parser
+defaultParser = 
+  mapDoc (changeRM (`runReaderT` defaultParserConfig)) (parserR embedRM)
 
-parser :: 
-  forall e m.
+parserR :: 
+  forall e.
   ShowR e 
   => Unfix e ~:> Monadic e P
   -> Instance (Monadic e P)
-parser DocMap {..} = Instance {..}
+parserR DocMap {..} = Instance {..}
  where
   getInl :: P (Inl e)
   getInl = label "inline" $ overInl =<< choice

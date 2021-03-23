@@ -25,7 +25,6 @@ import Control.Monad.Reader
 
 -- base
 import Unsafe.Coerce
-import Data.Void
 import Control.Category
 import Data.Monoid
 import Data.Foldable
@@ -38,8 +37,16 @@ data Instance e = Instance
   { getSec :: Sec e
   , getBlk :: Blk e
   , getInl :: Inl e
-  , getClosedSen :: Sen e 'Closed
-  , getOpenSen :: Sen e 'Open
+  , getClosedSen :: Sen 'Closed e
+  , getOpenSen :: Sen 'Open e
+  }
+
+type Run m e = Instance (Monadic m e)
+
+data Monadic (m :: * -> *) e
+
+newtype MonadicSen e (m :: * -> *) (b :: SenType) = MonadicSen 
+  { unMonadicSen :: m (Sen e b)
   }
 
 instance DocFunctor Instance where
@@ -112,7 +119,7 @@ pureR = DocMap
   { overSec = pure
   , overBlk = pure
   , overInl = pure
-  , overSen = \e -> MonadicSen $ pure e
+  , overSen = MonadicSen . pure
   }
 
 embedRM :: (Applicative m, EmbedableR e) => Unfix e ~:> Monadic e m
@@ -133,11 +140,6 @@ ana da = hylo da embedR
 
 
 
-data Monadic e (m :: * -> *)
-
-newtype MonadicSen e (m :: * -> *) (b :: SenType) = MonadicSen 
-  { unMonadicSen :: m (Sen e b)
-  }
 
 instance DocR (Monadic e m) where
   type Sec (Monadic e m) = m (Sec e) 
@@ -156,14 +158,23 @@ hyloM dist project embed = extract
  where 
   extract :: e ~:> Monadic e' m
   extract = DocMap 
-    { overSec = overSec embed <=< overSec dist . mapDoc extract <=<  overSec project
-    , overBlk = overBlk embed <=< overBlk dist . mapDoc extract <=<  overBlk project
-    , overInl = overInl embed <=< overInl dist . mapDoc extract <=<  overInl project
-    , overSen = MonadicSen .  
-      ( unMonadicSen . overSen embed 
-      <=< unMonadicSen . overSen dist . mapDocSen extract
-      <=< unMonadicSen . overSen project
-      )
+    { overSec = 
+        overSec embed 
+        <=< overSec dist . mapDoc extract 
+        <=< overSec project
+    , overBlk = 
+        overBlk embed 
+        <=< overBlk dist . mapDoc extract 
+        <=< overBlk project
+    , overInl = 
+        overInl embed 
+        <=< overInl dist . mapDoc extract 
+        <=< overInl project
+    , overSen = MonadicSen .
+        ( unMonadicSen . overSen embed 
+        <=< unMonadicSen . overSen dist . mapDocSen extract
+        <=< unMonadicSen . overSen project
+        )
     }
 
 -- Algebra
@@ -187,6 +198,9 @@ instance DocFunctor Sentences where
 instance DocFunctor Block where
   mapDoc e = \case 
     Para a -> Para (mapDoc e a)
+    Items itm -> Items (mapDoc e <$> itm)
+    Comment a -> Comment a
+    OrderedItems n itm -> OrderedItems n (mapDoc e <$> itm)
 
 instance DocFunctor Inline where
   mapDoc e = \case
@@ -195,7 +209,7 @@ instance DocFunctor Inline where
     a -> unsafeCoerce a 
 
 instance DocFunctor QoutedSentences where
-  mapDoc e (QoutedSentences {..}) = QoutedSentences 
+  mapDoc e QoutedSentences {..} = QoutedSentences 
     { qoutedSentences = mapDoc e qoutedSentences
     , ..
     }
@@ -307,7 +321,7 @@ foldDoc = DocAlgebra {..}
   fromSentence :: forall b. Sentence (Value m) b -> m
   fromSentence = \case
     OpenSentence wrds -> fold wrds
-    ClosedSentence wrds end -> fold wrds
+    ClosedSentence wrds _ -> fold wrds
 
 
 fromAlgebra :: DocAlgebra e a -> Unfix e ~:> Value a
@@ -323,7 +337,7 @@ toExtractor DocMap {..} = Extractor
   { fromSec = overSec
   , fromBlk = overBlk
   , fromInl = overInl
-  , fromSen = \a -> unSenValue (overSen a)
+  , fromSen = unSenValue . overSen
   }
 
 data GeneratorM e m = GeneratorM
@@ -353,72 +367,52 @@ countWords = fd { fromInline = \case
   }
  where fd = foldDoc
 
--- newtype ItemTree i = ItemTree (Item (ItemTree i, i))
--- 
--- compressItem :: (b -> Maybe (NE.NonEmpty (Item b i))) -> Item b i -> Maybe (ItemTree i)
--- compressItem fn Item {..} = ItemTree <$> do
---   contents <- case itemContents of
---     [c] -> fmap NE.toList . mapM (compressItem fn) =<< fn c
---     [] -> pure []
---     _ -> Nothing
---   pure $ Item
---     { itemType = itemType
---     , itemTodo = itemTodo
---     , itemTitle = itemTitle
---     , itemContents = contents
---     }
--- 
--- compressItem' :: Item Block' Inline' -> Maybe (ItemTree Inline')
--- compressItem' = compressItem (\case
---   Block' (Items it) -> Just it
---   _ -> Nothing
---   )
 
-instance DocR (a, b) where 
-  type Sec (a, b) = Void
-  type Inl (a, b) = b
-  type Blk (a, b) = a
-  type Sen (a, b) = Sentence (a, b)
+-- instance DocR (a, b) where 
+--   type Sec (a, b) = Void
+--   type Inl (a, b) = b
+--   type Blk (a, b) = a
+--   type Sen (a, b) = Sentence (a, b)
 
 
 -- TODO
-sequenceR :: forall m a. Monad m => Unfix (Monadic a m) ~:> Monadic (Unfix a) m
-sequenceR = DocMap {..}
- where 
-  overSec Section {..} = do
-    sectionTitle' <- overSentences sectionTitle
-    sectionContent' <- sequence sectionContent
-    sectionSubs' <- sequence sectionSubs
-    return Section
-      { sectionTitle = sectionTitle'
-      , sectionContent = sectionContent'
-      , sectionSubs = sectionSubs'
-      }
-
-  overBlk = \case 
-    Para a -> Para <$> overSentences a
-    Comment m -> pure $ Comment m
-
-  overInl = \case
-    Qouted q -> Qouted <$> overQoutedSentences q
-    -- a -> pure $ unsafeCoerce a
-
-  overSen :: forall b. Sentence (Monadic a m) b -> MonadicSen (Unfix a) m b
-  overSen = \case 
-    OpenSentence sen -> 
-      MonadicSen $ OpenSentence <$> sequence sen
-    ClosedSentence sen end -> 
-      MonadicSen $ ClosedSentence <$> sequence sen <*> pure end
-
-  overQoutedSentences QoutedSentences {..} = do
-    qoutedSentences' <- overSentences qoutedSentences
-    return QoutedSentences 
-      { qoutedSentences = qoutedSentences'
-      , ..
-      }
-
-  overSentences = \case 
-    OpenSentences sen -> 
-      OpenSentences <$> unMonadicSen sen 
-    ClosedSentences sen rest -> 
-      ClosedSentences <$> unMonadicSen sen <*> traverse overSentences rest
+-- sequenceR :: forall m a. Monad m => Unfix (Monadic a m) ~:> Monadic (Unfix a) m
+-- sequenceR = DocMap {..}
+--  where 
+--   overSec Section {..} = do
+--     sectionTitle' <- overSentences sectionTitle
+--     sectionContent' <- sequence sectionContent
+--     sectionSubs' <- sequence sectionSubs
+--     return Section
+--       { sectionTitle = sectionTitle'
+--       , sectionContent = sectionContent'
+--       , sectionSubs = sectionSubs'
+--       }
+-- 
+--   overBlk = \case 
+--     Para a -> Para <$> overSentences a
+--     Comment m -> pure $ Comment m
+-- 
+--   overInl = \case
+--     Qouted q -> Qouted <$> overQoutedSentences q
+--     a -> pure $ unsafeCoerce a
+-- 
+--   overSen :: forall b. Sentence (Monadic a m) b -> MonadicSen (Unfix a) m b
+--   overSen = \case 
+--     OpenSentence sen -> 
+--       MonadicSen $ OpenSentence <$> sequence sen
+--     ClosedSentence sen end -> 
+--       MonadicSen $ ClosedSentence <$> sequence sen <*> pure end
+-- 
+--   overQoutedSentences QoutedSentences {..} = do
+--     qoutedSentences' <- overSentences qoutedSentences
+--     return QoutedSentences 
+--       { qoutedSentences = qoutedSentences'
+--       , ..
+--       }
+-- 
+--   overSentences = \case 
+--     OpenSentences sen -> 
+--       OpenSentences <$> unMonadicSen sen 
+--     ClosedSentences sen rest -> 
+--       ClosedSentences <$> unMonadicSen sen <*> traverse overSentences rest

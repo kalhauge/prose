@@ -33,8 +33,10 @@ import Prose.Recursion
 spec :: Spec
 spec = return ()
 
-generate :: (EmbedableR e, MonadGen m) => Instance (Monadic e m)
-generate = mapDoc (changeRM (flip runReaderT [minBound .. maxBound])) (generateR embedRM)
+generate :: (EmbedableR e, MonadGen m) => InstanceM e m
+generate = mapDoc 
+  (changeRM (`runReaderT` [minBound .. maxBound])) 
+  (generateR embedRM)
 
 generateR :: forall e m. 
   (MonadGen m, MonadReader [Qoute] m)
