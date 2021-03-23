@@ -285,11 +285,29 @@ extractR DocAlgebra {..} = cata $ DocMap $ Instance
   fromSentence 
   fromSentence
 
-cataA :: forall e a. ProjectableR e 
+cataA :: forall e a. 
+  ProjectableR e
   => DocAlgebra (Value a) a 
   -> DocAlgebra e a
-cataA fn = 
-  extractR fn `contramapAlgebra` fn
+cataA alg = extractR alg `contramapAlgebra` alg
+
+
+foldR :: forall e v. 
+     (e ~:> Unfix e)
+  -> (Extractor e v -> DocAlgebra e v) 
+  -> Extractor e v
+foldR project fn = extractor . project
+ where
+  DocAlgebra {..} = fn (extractor . project)
+  -- gen = mapDoc (joinR . underR emb) generator
+  extractor :: Extractor (Unfix e) v
+  extractor = DocMap $ Instance 
+   { onSec = fromSection
+   , onBlk = fromBlock
+   , onInl = fromInline
+   , onOpenSen = fromSentence
+   , onClosedSen = fromSentence
+   }
 
 contramapAlgebra :: e ~:> e' -> DocAlgebra e' a -> DocAlgebra e a
 contramapAlgebra e DocAlgebra {..} = DocAlgebra
@@ -369,6 +387,21 @@ data DocCoAlgebra m e = DocCoAlgebra
   , toClosedSentence :: m (Sentence 'Closed e)
   } 
 
+natCoAlgebra :: 
+  (forall a. m a -> m' a) 
+  -> DocCoAlgebra m e 
+  -> DocCoAlgebra m' e 
+natCoAlgebra fn DocCoAlgebra {..} = DocCoAlgebra 
+  { toSection = fn toSection
+  , toBlock = fn toBlock
+  , toInline = fn toInline
+  , toItem = fn toItem
+  , toOrderedItem = fn toOrderedItem
+  , toSentences = fn toSentences
+  , toQoutedSentences = fn toQoutedSentences
+  , toOpenSentence = fn toOpenSentence
+  , toClosedSentence = fn toClosedSentence
+  }
 
 instance Functor m => DocFunctor (DocCoAlgebra m) where
   mapDoc fn DocCoAlgebra {..} = DocCoAlgebra 

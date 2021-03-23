@@ -25,10 +25,16 @@ import qualified Hedgehog.Range as Range
 
 import SpecHelper
 import Prose.Doc
+import Prose.Simple
 import Prose.Recursion
 
 spec :: Spec
 spec = return ()
+
+genSimple :: MonadGen m => DocCoAlgebra m Simple
+genSimple = natCoAlgebra (`runReaderT` [minBound..maxBound]) gen
+ where
+  gen = generateR (anaA embedRM generateR)
 
 generate :: (EmbedableR e, MonadGen m) => Generator m e
 generate = 

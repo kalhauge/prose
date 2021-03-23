@@ -58,16 +58,19 @@ specInline = describe "inline" do
   ex "ex\\." $ Word "ex."
   ex "@ref" $ Reference "ref"
 
-  focus $ describe "simple inlines" do
-    serializeRoundtrip @Inline'
+  describe "simple inlines" do
+    serializeRoundtrip 
       (onInl (generate @Simple))
       (overInl simpleSerialized)
       (onInl (defaultParser @Simple))
 
-  -- describe "simple sentences" do
-  --   serializeRoundtrip
-  --     (runReaderT (genSentences genSimpleInline) genConfig)
-  --     sSentences pSentences
+  describe "simple sentences" do
+    serializeRoundtrip
+      (toSentences genSimple)
+      (fromSentences serializeSimple)
+      (toSentences parseSimple)
+      -- (runReaderT (genSentences genSimpleInline) genConfig)
+      -- sSentences pSentences
 
  where
    ex txt rst = it ("should parse " ++ show txt) do

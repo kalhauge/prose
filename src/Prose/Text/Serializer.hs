@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
@@ -12,7 +13,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
-{-# OPTIONS_GHC -Wno-missing-fields #-}
 module Prose.Text.Serializer where
 
 -- mtl
@@ -40,8 +40,9 @@ import Prose.Recursion
 type Builder = Builder.Builder
 
 data SerialConfig = SerialConfig
-  { sCfgIndent :: Int
-  , sCfgSingleLine :: Bool
+  { sCfgIndent :: !Int
+  , sCfgSingleLine :: !Bool
+  , sCfgHeaderDepth :: !Int
   }
 
 data SerializeHandler e = SerializeHandler
@@ -67,6 +68,14 @@ singleline :: Serialized -> Serialized
 singleline (Serialized ser) = Serialized \cfg -> 
   ser (cfg { sCfgSingleLine = True })
 
+indent :: Serialized -> Serialized
+indent (Serialized ser) = Serialized \cfg -> 
+  ser (cfg { sCfgIndent = sCfgIndent cfg + 1 })
+
+increaseHeader :: Serialized -> Serialized
+increaseHeader (Serialized ser) = Serialized \cfg -> 
+  ser (cfg { sCfgHeaderDepth = sCfgHeaderDepth cfg + 1 })
+
 data Serial
 
 instance DocR Serial where
@@ -76,10 +85,17 @@ instance DocR Serial where
   type OpenSen Serial = Serialized
   type ClosedSen Serial = Serialized
 
+serializeSimple :: DocAlgebra Simple Text.Text
+serializeSimple = f <$> ser x
+ where 
+  x = foldR projectR ser
+  ser = serializeX simpleHandler
+  f a = LazyText.toStrict 
+    . Builder.toLazyText 
+    $ serializeWithConfig a (SerialConfig 0 True 1)
 
-simpleSerialized :: Extractor Simple Text.Text
-simpleSerialized =
-  serialized SerializeHandler {..}
+simpleHandler :: SerializeHandler Simple
+simpleHandler = SerializeHandler {..}
  where
   sCfgInlineSep _ (Inline' i) = case i of
     Mark _ -> 
@@ -95,44 +111,28 @@ simpleSerialized =
       | x1 == x2 -> sEndLine <> sEndLine
     _ -> sEndLine
 
+simpleSerialized :: Extractor Simple Text.Text
+simpleSerialized =
+  serialized simpleHandler
+
 serialized :: ProjectableR e => 
   SerializeHandler e 
   -> Extractor e Text.Text
-serialized handler = extractor . serialize handler 
+serialized handler = mapV f . serialize handler 
   where 
-    extractor :: Serial ~:> Value Text.Text 
-    extractor = DocMap $ Instance {..} 
+    f x = LazyText.toStrict . Builder.toLazyText $ 
+      serializeWithConfig x (SerialConfig 0 True 1)
 
-    onSec :: (Int -> Serialized) -> Text.Text
-    onSec sn = LazyText.toStrict . Builder.toLazyText $ 
-      serializeWithConfig (sn 0) (SerialConfig 0 True)
-
-serialize :: ProjectableR e => SerializeHandler e -> e ~:> Serial
-serialize handler = cata (serializeR handler)
-
-serializeR :: forall a e. 
-  a ~ Serial
-  => SerializeHandler e
-  -> Unfix a ~:> a
-serializeR SerializeHandler {} = DocMap $ Instance {..}
- where
-  onSec Section {..} n =
-    stimes n "#" <> " " <> singleline (sSentences sectionTitle) <> sEndLine
-    <> (case NE.nonEmpty sectionContent of
-      Just blks -> sEndLine <> fold blks
-      Nothing -> mempty
-    )
-    <> foldMap (\s -> sEndLine <> s (n+1)) sectionSubs
-
-  sSentences = \case
-    OpenSentences sen ->
-      sen
-    ClosedSentences s rest -> 
-      s <> foldMap (\m -> sSentenceSep <> sSentences m) rest
-
+serialize :: ProjectableR e 
+  => SerializeHandler e 
+  -> Extractor e Serialized
+serialize handler = foldR projectR (serializeX handler)
 
 sEndLine :: Serialized
 sEndLine = "\n"
+
+sText :: Text.Text -> Serialized
+sText txt = Serialized \_ -> Builder.fromText txt
 
 sIndent :: Serialized
 sIndent = Serialized \cfg -> 
@@ -143,6 +143,170 @@ sSentenceSep = Serialized \cfg ->
   if sCfgSingleLine cfg 
   then " "
   else let Serialized x = sEndLine <> sIndent in x cfg
+
+sHeader :: Serialized 
+sHeader = Serialized \(sCfgHeaderDepth -> n) ->
+  stimes n "#"
+
+sEscaped :: Text.Text -> Serialized
+sEscaped txt = Serialized \_ ->
+  Builder.fromText $ Text.intercalate "\\." (Text.splitOn "." txt)
+
+sEscapedEnd :: Text.Text -> Serialized
+sEscapedEnd txt = Serialized \_ ->
+  let normal = Text.dropWhileEnd (== '.') txt
+  in Builder.fromText normal <>
+    stimesMonoid (Text.length txt - Text.length normal) "\\."
+
+-- serializeR :: forall a e. 
+--   a ~ Serial
+--   => SerializeHandler e
+--   -> Unfix a ~:> a
+-- serializeR SerializeHandler {} = DocMap $ Instance {..}
+--  where
+--   onSec Section {..} n =
+--     stimes n "#" <> " " <> singleline (sSentences sectionTitle) <> sEndLine
+--     <> (case NE.nonEmpty sectionContent of
+--       Just blks -> sEndLine <> fold blks
+--       Nothing -> mempty
+--     )
+--     <> foldMap (\s -> sEndLine <> s (n+1)) sectionSubs
+
+
+serializeX :: forall e.
+    SerializeHandler e 
+ -> Extractor e Serialized
+ -> DocAlgebra e Serialized
+serializeX SerializeHandler {..} ex = DocAlgebra {..}
+ where
+  fromSection Section {..} = 
+    sHeader <> " " <> singleline (fromSentences sectionTitle) <> sEndLine
+    <> (case NE.nonEmpty sectionContent of
+      Just blks -> sEndLine <> sIntercalate sCfgBlockSep (overBlk ex) blks
+      Nothing -> mempty
+    )
+    <> foldMap 
+        (\s -> sEndLine <> increaseHeader (overSec ex s)) 
+        sectionSubs
+
+  fromSentences = \case
+    OpenSentences sen ->
+      overOpenSen ex sen
+    ClosedSentences s rest -> 
+      overClosedSen ex s 
+      <> foldMap (\m -> sSentenceSep <> fromSentences m) rest
+
+  sIntercalate :: 
+       (a -> a -> Serialized) 
+    -> (a -> Serialized) 
+    -> NE.NonEmpty a 
+    -> Serialized
+  sIntercalate sep x (r NE.:| rest) = 
+    x r <> foldMap
+      (\(r1, r2) -> sep r1 r2 <> x r2)
+      (zip (r:rest) rest)
+
+  fromBlocks = 
+    sIntercalate sCfgBlockSep (overBlk ex) 
+
+  fromInline = \case
+    Word x -> sEscaped x
+    Number x -> sEscapedEnd x
+    Mark Comma -> ","
+    Mark Colon -> ":"
+    Mark SemiColon -> ";"
+    Verbatim txt -> "`" <> sText txt <> "`"
+    Reference txt -> "@" <> sText txt
+    Qouted q -> fromQoutedSentences q
+  
+  fromBlock = \case
+    Para sb ->
+      sIndent <> fromSentences sb <> sEndLine
+  
+    Comment its ->
+      foldMap
+        (\i -> sIndent <> "--" <> sText i <> sEndLine)
+        its
+  
+    Items itms -> 
+      -- case compressItems itms of
+      -- Just trees ->
+      --   foldMap sItemTree trees
+      -- Nothing ->
+      let (i NE.:| its) = itms
+      in fromItem i <> foldMap (\i' -> sEndLine <> fromItem i') its
+  
+    OrderedItems _n (i NE.:| its) ->
+      fromNumberedItem 1 i
+      <> foldMap
+        (\(n, i') -> sEndLine <> fromNumberedItem n i')
+        (zip [2..] its)
+  
+  -- sItemTree = sIndent <> over \(ItemTree (Item it _ tt blks)) -> indent $
+  --    (sItemType $< it)
+  --    <> (sSentences $< tt)
+  --    <> sEndLine
+  --    <> case NE.nonEmpty blks of
+  --         Nothing -> mempty
+  --         Just trees -> foldMap (sItemTree $<) trees
+  
+  fromItem (Item it _ tt blks) = sIndent <> indent 
+    ( fromItemType it
+     <> fromSentences tt
+     <> sEndLine
+     <> case NE.nonEmpty blks of
+          Nothing -> mempty
+          Just blks' ->
+            sEndLine <> fromBlocks blks'
+    )
+  
+  fromItemType = \case
+    Minus -> "- "
+    Plus  -> "+ "
+    Times -> "* "
+
+
+  fromOrderedItem = 
+    fromNumberedItem 0
+
+  fromNumberedItem x (OrderedItem _ tt blks) = sIndent <> 
+    indent (
+      (sText . Text.pack . show $ (x :: Int))
+      <> ") "
+      <> fromSentences tt 
+      <> sEndLine
+      <> ( case NE.nonEmpty blks of
+          Nothing -> mempty
+          Just blks' ->
+            sEndLine <> fromBlocks blks'
+      )
+    )
+  
+  fromQoutedSentences (QoutedSentences qoute sens) =
+    let qouteit f t = f <> fromSentences sens <> t
+    in case qoute of
+      Brackets -> qouteit "[" "]"
+      DoubleQoute -> qouteit "\"" "\""
+      Parenthesis -> qouteit "(" ")"
+      Emph -> qouteit "/" "/"
+      Strong -> qouteit "*" "*"
+
+  fromInlines = 
+    sIntercalate sCfgInlineSep (overInl ex)
+
+  fromSentence :: Sentence b e -> Serialized
+  fromSentence = \case
+    ClosedSentence i ends -> 
+      fromInlines i <> foldMap fromEnd ends
+    OpenSentence i -> 
+      fromInlines i
+
+  fromEnd :: End -> Serialized
+  fromEnd = \case
+    Exclamation -> "!"
+    Question -> "?"
+    Period -> "."
+
 
 -- data SerialConfig b i = SerialConfig
 --   { sCfgInline :: Serializer b i i
@@ -184,15 +348,6 @@ sSentenceSep = Serialized \cfg ->
 -- sText :: Serializer b i Text.Text
 -- sText = Serial \_ txt -> Builder.fromText txt
 -- 
--- sEscaped :: Serializer b i Text.Text
--- sEscaped = Serial \_ txt ->
---   Builder.fromText $ Text.intercalate "\\." (Text.splitOn "." txt)
--- 
--- sEscapedEnd :: Serializer b i Text.Text
--- sEscapedEnd = Serial \_ txt ->
---   let normal = Text.dropWhileEnd (== '.') txt
---   in Builder.fromText normal <>
---     stimesMonoid (Text.length txt - Text.length normal) "\\."
 -- 
 -- sWithCompressedItems :: (Maybe (NE.NonEmpty (ItemTree i)) -> Serializer b i ())
 --   -> Serializer b i (NE.NonEmpty (Item b i))

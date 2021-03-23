@@ -14,7 +14,6 @@
 -- |
 --
 -- Parse a doc from Markdown.
-{-# OPTIONS_GHC -Wno-missing-fields #-}
 module Prose.Text.Parser where
 
 -- mtl
@@ -40,19 +39,24 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Debug qualified as DBG
 
 -- parser-combinators
--- import Control.Monad.Combinators.NonEmpty
+import Control.Monad.Combinators.NonEmpty
 
 import Prose.Doc
+import Prose.Simple
 import Prose.Builder ()
 import Prose.Recursion
 
-defaultParser :: 
-  (ShowR e, EmbedableR e)
-  => Monadic Parser e
-defaultParser = 
-  mapDoc 
-    (natR (`runReaderT` defaultParserConfig)) 
-    (parserR (pureR . embedR))
+
+-- parseSimple :: DocCoAlgebra Parser Simple
+-- parseSimple =
+--     (parserR (pureR . embedR))
+
+-- defaultParser :: 
+--   (ShowR e, EmbedableR e)
+--   => Monadic Parser e
+-- defaultParser = 
+--   natCoAlgebra (`runReaderT` defaultParserConfig)) 
+--     parserR embedRM
 
 type Parser = Parsec Void Text.Text
 
@@ -86,7 +90,8 @@ addDepth name =
 dbg :: Show a => String -> P a -> P a
 dbg name p = ReaderT \cfg -> 
   case pCfgDepth cfg of
-    Just d -> DBG.dbg (L.intercalate "/" (reverse (name:d))) (runReaderT p cfg)
+    Just d -> 
+      DBG.dbg (L.intercalate "/" (reverse (name:d))) (runReaderT p cfg)
     Nothing -> runReaderT p cfg
 
 pushActiveQoute ::
@@ -94,23 +99,34 @@ pushActiveQoute ::
 pushActiveQoute qoute =
   local (\a -> a { pCfgActiveQoutes = qoute:pCfgActiveQoutes a })
 
+parseSimple :: DocCoAlgebra Parser Simple
+parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) gen
+ where
+  gen = parserR (anaA embedRM parserR)
+
+defaultParser :: (ShowR e, EmbedableR e) 
+  => Generator Parser e
+defaultParser = 
+  mapDoc (runReaderTR defaultParserConfig) 
+  $ anaA embedRM parserR
 
 parserR :: 
-  forall e.
-  ShowR e 
-  => Unfix e ~:> Apply P e
-  -> Monadic P e
-parserR app = Instance {..}
+  forall e.  ShowR e 
+  -- => Unfix e ~:> Apply P e
+  -- -> Monadic P e
+  => Generator P e
+  -> DocCoAlgebra P e
+parserR app = DocCoAlgebra {..}
  where
-  onInl :: P (Inl e)
-  onInl = label "inline" $ overInl app =<< choice
+  toInline = label "inline" $ choice
     [ char ',' $> Mark Comma
     , char ':' $> Mark Colon
     , char ';' $> Mark SemiColon
     , char '@' *> (Reference <$> pWord)
     , do
         void $ char '`'
-        v <- Verbatim <$> takeWhileP (Just "verbatim") (\i -> i /= '`' && i /= '\n')
+        v <- Verbatim 
+          <$> takeWhileP (Just "verbatim") (\i -> i /= '`' && i /= '\n')
         void $ char '`'
         return v
     , try $ do
@@ -122,37 +138,38 @@ parserR app = Instance {..}
           x <- satisfy (\t -> t == ',' || t == '.')
           Text.cons x <$> (string "-" <* notFollowedBy pWord)
         points <- many (string "\\." $> ".")
-        return . Number $ Text.concat (digits : parts) <> fromMaybe mempty str <> Text.concat points
+        return . Number $ Text.concat (digits : parts) 
+          <> fromMaybe mempty str 
+          <> Text.concat points
     , Word <$> pWord
-    , Qouted <$> onQoutedSentences
+    , Qouted <$> toQoutedSentences
     ]
- 
-  onQoutedSentences :: P (QoutedSentences e)
-  onQoutedSentences = try $ do
+  
+  toQoutedSentences = try $ do
     qoutedType <- pStartQoute
-    qoutedSentences <- pushActiveQoute qoutedType onSentences
+    qoutedSentences <- pushActiveQoute qoutedType toSentences
     pEndQoute qoutedType
     return $ QoutedSentences { .. }
 
   -- | This parser will consume sentences and a final newline.
-  onSentences :: P (Sentences e)
-  onSentences = do
-    inlines <- pInlines
-    mEnds <- many pEnd
-    case NE.nonEmpty mEnds of
-      Nothing -> do
-        sen <- overOpenSen app $ OpenSentence inlines
-        return $ OpenSentences sen
-      Just ends -> do
-        sen <- overClosedSen app $ ClosedSentence inlines ends
-        rest <- optional $ try (pInlineSep *> lookAhead onInl) *> onSentences
-        return $ ClosedSentences sen rest
+  toSentences :: P (Sentences e)
+  toSentences = choice 
+    [ do
+      sen <- onClosedSen app 
+      rest <- optional 
+        $ try (pInlineSep *> lookAhead (onInl app)) 
+          *> toSentences
+      return $ ClosedSentences sen rest
+    , do
+      sen <- onOpenSen app 
+      return $ OpenSentences sen
+    ]
 
-  pInlines :: P (NE.NonEmpty (Inl e))
-  pInlines = do
-    i <- onInl
-    is <- many (try (pInlineSep *> onInl))
-    return $ i NE.:| is
+  -- pInlines :: P (NE.NonEmpty (Inl e))
+  -- pInlines = do
+  --   i <- onInl app
+  --   is <- many (try (pInlineSep *> onInl app))
+  --   return $ i NE.:| is
 
   pEndQoute = \case
     Brackets -> void $ label "end of bracket (])" (char ']')
@@ -201,6 +218,82 @@ parserR app = Instance {..}
       ]
     return $ Text.cons c (Text.concat txt)
 
+  -- pBlocks :: Show b => Parser b i (NE.NonEmpty b)
+  pBlocks = label "blocks" $
+    some (try (many pEmptyLine *> pIndent) *> onBlk app)
+  
+  -- | Parses a single block
+  -- pBlock :: X b i => Parser b i (Block b i)
+  toBlock = label "block" do
+    choice
+      [ comment
+      , orderedItems
+      , items
+      , para
+      ]
+
+   where
+    orderedItems = label "ordered items" $ choice
+      [ do
+          _ <- lookAhead pNumeralType
+          i <- pNumeralItem
+          is <- many 
+              (try (optional pEmptyLine *> pIndent *> lookAhead pNumeralType) *> pNumeralItem)
+          return $ OrderedItems Numeral (i NE.:| is)
+      ]
+  
+    comment = label "comment" do
+      t <- commentLine
+      ts <- many (try (eol *> pIndent *> commentLine))
+      void eol <|> void eof
+      return $ Comment (t:ts)
+  
+    commentLine = label "comment line" do
+      string "--" *> takeWhileP (Just "a comment line") (/= '\n')
+  
+    para = label "paragraph" do
+      s <- toSentences
+      hspace <* eol <|> eof
+      return $ Para s
+  
+    items = label "items" do
+      i <- item
+      is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> item)
+      return $ Items (i NE.:| is)
+  
+    pItemType = label "an item ('-', '*', or '+')" $ choice
+      [ char '-' $> Minus
+      , char '+' $> Plus
+      , char '*' $> Times
+      ] <* hspace1
+  
+    item = label "item" do
+      itemType <- try (hspace *> pItemType)
+      let itemTodo = Nothing
+      indent do
+        itemTitle <- pSentences
+        dbg "empty" (eof <|> pEmptyLine)
+        itemContents <- label "item content" $ choice
+          [ NE.toList <$> pBlocks
+          , pure []
+          ]
+        pure $ Item {..}
+  
+    pNumeralType = try (takeWhile1P Nothing isNumber <* char ')') <* hspace1
+  
+    pNumeralItem = label "numeral item" do
+      _ <- pNumeralType
+      let orderedItemTodo = Nothing
+      indent do
+        orderedItemTitle <- pSentences
+        dbg "empty" (eof <|> pEmptyLine)
+        orderedItemContents <- label "item content" $ choice
+          [ NE.toList <$> pBlocks
+          , pure []
+          ]
+        pure $ OrderedItem {..}
+
+  pEmptyLine = label "empty line" . try .  void $ hspace *> eol
 
 -- data ParserConfig b i = ParserConfig
 --   { pCfgParseB :: Parser b i b
@@ -248,8 +341,6 @@ parserR app = Instance {..}
 --   { pCfgSingleLineSentences = True
 --   }
 -- 
--- pEmptyLine :: Parser b i ()
--- pEmptyLine = label "empty line" . try .  void $ hspace *> eol
 -- 
 -- 
 -- --- Parsers
@@ -304,79 +395,6 @@ parserR app = Instance {..}
 -- -- Sentence
 -- 
 -- 
--- pBlocks :: Show b => Parser b i (NE.NonEmpty b)
--- pBlocks = label "blocks" $
---   some (try (many pEmptyLine *> pIndent) *> pB)
--- 
--- -- | Parses a single block
--- pBlock :: X b i => Parser b i (Block b i)
--- pBlock = label "block" do
---   choice
---     [ comment
---     , orderedItems
---     , items
---     , para
---     ]
--- 
---  where
---   orderedItems = label "ordered items" $ choice
---     [ do
---         _ <- lookAhead pNumeralType
---         i <- pNumeralItem
---         is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pNumeralType) *> pNumeralItem)
---         return $ OrderedItems Numeral (i NE.:| is)
---     ]
--- 
---   comment = label "comment" do
---     t <- commentLine
---     ts <- many (try (eol *> pIndent *> commentLine))
---     void eol <|> void eof
---     return $ Comment (t:ts)
--- 
---   commentLine = label "comment line" do
---     string "--" *> takeWhileP (Just "a comment line") (/= '\n')
--- 
---   para = label "paragraph" do
---     s <- pSentences
---     hspace <* eol <|> eof
---     return $ Para s
--- 
---   items = label "items" do
---     i <- item
---     is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> item)
---     return $ Items (i NE.:| is)
--- 
---   pItemType = label "an item ('-', '*', or '+')" $ choice
---     [ char '-' $> Minus
---     , char '+' $> Plus
---     , char '*' $> Times
---     ] <* hspace1
--- 
---   item = label "item" do
---     itemType <- try (hspace *> pItemType)
---     let itemTodo = Nothing
---     indent do
---       itemTitle <- pSentences
---       dbg "empty" (eof <|> pEmptyLine)
---       itemContents <- label "item content" $ choice
---         [ NE.toList <$> pBlocks
---         , pure []
---         ]
---       pure $ Item {..}
--- 
---   pNumeralType = try (takeWhile1P Nothing isNumber <* char ')') <* hspace1
--- 
---   pNumeralItem = label "numeral item" do
---     _ <- pNumeralType
---     let orderedItemTodo = Nothing
---     indent do
---       orderedItemTitle <- pSentences
---       dbg "empty" (eof <|> pEmptyLine)
---       orderedItemContents <- label "item content" $ choice
---         [ NE.toList <$> pBlocks
---         , pure []
---         ]
---       pure $ OrderedItem {..}
 -- 
 -- -- Sections
 -- 
