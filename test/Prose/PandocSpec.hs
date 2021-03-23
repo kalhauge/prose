@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 module Prose.PandocSpec where
 
 
@@ -14,12 +15,12 @@ import Prose.Pandoc
 import Prose.Builder ()
 import Prose.DocSpec
 
-
 spec :: Spec
 spec = do
-  prop "should do something" do
-    i <- forAll $ runReaderT genSimpleSection genConfig
-    let a = toPandoc i
-    a === a
+  return ()
+--   prop "should do something" do
+--     i <- forAll $ runReaderT genSimpleSection genConfig
+--     let a = toPandoc i
+--     a === a
 
 

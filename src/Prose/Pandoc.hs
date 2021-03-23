@@ -27,41 +27,45 @@ instance DocR PandocRes where
   type Sec PandocRes = Int -> PD.Blocks
   type Blk PandocRes = PD.Blocks
   type Inl PandocRes = (Bool, PD.Inlines)
-  type Sen PandocRes = SenValue PD.Inlines
+  type OpenSen PandocRes = PD.Inlines
+  type ClosedSen PandocRes = PD.Inlines
 
 toPandoc :: Unfix PandocRes ~:> PandocRes
-toPandoc = DocMap {..}
+toPandoc = DocMap $ Instance {..}
  where
-  overSec Section {..} n = fold
-   [ PD.header n (overSentences sectionTitle)
+  onSec Section {..} n = fold
+   [ PD.header n (onSentences sectionTitle)
    , fold sectionContent
    , foldMap ($ n+1) sectionSubs
    ]
 
-  overBlk = \case
+  onBlk = \case
     Para p ->
-      PD.para $ overSentences p
+      PD.para $ onSentences p
     Items i ->
-      PD.bulletList . map overItem $ NE.toList i
+      PD.bulletList . map onItem $ NE.toList i
     OrderedItems _ its ->
-      PD.orderedList . map overOrderedItem $ NE.toList its
+      PD.orderedList . map onOrderedItem $ NE.toList its
     Comment _ -> mempty
 
-  overSen :: Sen (Unfix PandocRes) b -> Sen PandocRes b
-  overSen = SenValue . \case
-    OpenSentence ss -> overInlines ss
-    ClosedSentence ss ends -> overInlines ss <> foldMap overEnd ends
+  onOpenSen :: OpenSen (Unfix PandocRes) -> OpenSen PandocRes
+  onOpenSen = \case
+    OpenSentence ss -> onInlines ss
+  
+  onClosedSen :: ClosedSen (Unfix PandocRes) -> ClosedSen PandocRes
+  onClosedSen = \case
+    ClosedSentence ss ends -> onInlines ss <> foldMap onEnd ends
 
-  overEnd :: End -> PD.Inlines
-  overEnd = \case
+  onEnd :: End -> PD.Inlines
+  onEnd = \case
     Exclamation -> "!"
     Period -> "."
     Question -> "?"
 
-  overInlines (s NE.:| ss) =
+  onInlines (s NE.:| ss) =
     snd s <> flip foldMap ss \(b, y) -> (if b then PD.space else mempty) <> y
 
-  overInl  = \case
+  onInl  = \case
     Mark x -> 
       ( False
       , case x of 
@@ -73,28 +77,26 @@ toPandoc = DocMap {..}
     Number a -> (True, PD.str a)
     Reference a -> (True, PD.str ("@" <> a))
     Word i -> (True, PD.str i)
-    Qouted q -> (True, overQoute q)
+    Qouted q -> (True, onQoute q)
 
-  overQoute (QoutedSentences x b) = overSentences b & case x of
+  onQoute (QoutedSentences x b) = onSentences b & case x of
     DoubleQoute -> PD.doubleQuoted
     Emph -> PD.emph
     Strong -> PD.strong
     Parenthesis -> \a -> "(" <> a <> ")"
     Brackets -> \a -> "[" <> a <> "]"
 
-  overItem (Item _ _ t bs) =
-    PD.plain (overSentences t)
+  onItem (Item _ _ t bs) =
+    PD.plain (onSentences t)
     <> fold bs
 
-  overOrderedItem (OrderedItem _ t bs) =
-    PD.plain (overSentences t)
+  onOrderedItem (OrderedItem _ t bs) =
+    PD.plain (onSentences t)
     <> fold bs
 
-  overSentences = \case
-    OpenSentences s -> 
-      unSenValue s
-    ClosedSentences s rst -> 
-      unSenValue s <> PD.space <> foldMap overSentences rst
+  onSentences = \case
+    OpenSentences s -> s
+    ClosedSentences s rst -> s <> PD.space <> foldMap onSentences rst
 
 -- | Convert a Simple Doc to a PandocRes
 simpleToPandoc :: Simple ~:> PandocRes

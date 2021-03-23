@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
@@ -36,15 +37,16 @@ class DocR e where
   type Sec e :: *
   type Blk e :: *
   type Inl e :: *
-  type Sen (b :: SenType) e :: *
+  type OpenSen e :: *
+  type ClosedSen e :: *
 
 class 
   ( DocR e
   , Show (Sec e)
   , Show (Blk e)
   , Show (Inl e)
-  , Show (Sen 'Open e)
-  , Show (Sen 'Closed e)
+  , Show (OpenSen e)
+  , Show (ClosedSen e)
   ) => ShowR e where
 
 class 
@@ -52,16 +54,16 @@ class
   , Eq (Sec e)
   , Eq (Blk e)
   , Eq (Inl e)
-  , Eq (Sen 'Open e)
-  , Eq (Sen 'Closed e)
+  , Eq (OpenSen e)
+  , Eq (ClosedSen e)
   ) => EqR e where
 class 
   ( EqR e
   , Ord (Sec e)
   , Ord (Blk e)
   , Ord (Inl e)
-  , Ord (Sen 'Open e)
-  , Ord (Sen 'Closed e)
+  , Ord (OpenSen e)
+  , Ord (ClosedSen e)
   ) => OrdR e where
 
 -- | A Section
@@ -118,8 +120,8 @@ data OrderType
   deriving (Eq, Show, Enum, Bounded, Ord)
 
 data Sentences e
-  = OpenSentences (Sen 'Open e)
-  | ClosedSentences (Sen 'Closed e) (Maybe (Sentences e))
+  = OpenSentences (OpenSen e)
+  | ClosedSentences (ClosedSen e) (Maybe (Sentences e))
 
 deriving instance EqR e => Eq (Sentences e)
 deriving instance OrdR e => Ord (Sentences e)
@@ -128,15 +130,15 @@ instance ShowR e => Show (Sentences e) where
   showsPrec n s =
     showParen (n > 10) $ showString "sen" . showsPrec 11 (toSentenceBuilder s)
 
-data AnySen e = forall b. AnySen { getAnySen :: Sen e b }
+-- data AnySen e = forall b. AnySen { getAnySen :: Sen e b }
 
-data Sentence e a where
-  ClosedSentence   :: NE.NonEmpty (Inl e) -> NE.NonEmpty End -> Sentence e 'Closed 
-  OpenSentence :: NE.NonEmpty (Inl e) -> Sentence e 'Open 
+data Sentence a e where
+  ClosedSentence   :: NE.NonEmpty (Inl e) -> NE.NonEmpty End -> Sentence 'Closed e
+  OpenSentence :: NE.NonEmpty (Inl e) -> Sentence 'Open e
 
-deriving instance EqR e => Eq (Sentence e a)
-deriving instance OrdR e => Ord (Sentence e a)
-deriving instance ShowR e => Show (Sentence e a)
+deriving instance EqR e => Eq (Sentence a e)
+deriving instance OrdR e => Ord (Sentence a e)
+deriving instance ShowR e => Show (Sentence a e)
 
 data End
   = Exclamation
@@ -188,7 +190,7 @@ fromSentenceBuilder = \case
   AllClosed rest ->
     go Nothing rest
  where
-  go :: Maybe (Sentences e) -> NE.NonEmpty (Sen 'Closed e) -> Sentences e
+  go :: Maybe (Sentences e) -> NE.NonEmpty (ClosedSen e) -> Sentences e
   go x (s NE.:| ss) = case NE.nonEmpty ss of
     Nothing -> ClosedSentences s x
     Just rst-> go (Just $ ClosedSentences s x) rst
@@ -204,8 +206,8 @@ toSentenceBuilder = go []
 
 
 data SentenceBuilder e =
-  Current (Sen 'Open e) [Sen 'Closed e]
-  | AllClosed (NE.NonEmpty (Sen 'Closed e))
+  Current (OpenSen e) [ClosedSen e]
+  | AllClosed (NE.NonEmpty (ClosedSen e))
 
 deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
@@ -220,5 +222,9 @@ instance DocR (ItemTree e) where
   type Sec (ItemTree e) = Void
   type Blk (ItemTree e) = ItemTree e
   type Inl (ItemTree e) = Inl e
-  type Sen b (ItemTree e) = Sen b e
+  type OpenSen (ItemTree e) = OpenSen e
+  type ClosedSen (ItemTree e) = ClosedSen e
+  -- type Sen b (ItemTree e) = Sen b e
+
+
 

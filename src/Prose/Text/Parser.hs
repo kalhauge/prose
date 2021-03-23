@@ -15,6 +15,7 @@
 -- |
 --
 -- Parse a doc from Markdown.
+{-# OPTIONS_GHC -Wno-missing-fields #-}
 module Prose.Text.Parser where
 
 -- mtl
@@ -22,6 +23,8 @@ import Control.Monad.Reader
 
 -- base
 import Data.Void
+import Control.Category
+import Prelude hiding ((.))
 import Data.Maybe
 import Data.Functor
 import Data.List qualified as L
@@ -38,7 +41,7 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Debug qualified as DBG
 
 -- parser-combinators
-import Control.Monad.Combinators.NonEmpty
+-- import Control.Monad.Combinators.NonEmpty
 
 import Prose.Doc
 import Prose.Builder ()
@@ -86,20 +89,22 @@ pushActiveQoute qoute =
 
 
 defaultParser :: 
-  (ShowR e, EmbedableR e) 
-  => InstanceM e Parser
+  (ShowR e, EmbedableR e)
+  => Monadic Parser e
 defaultParser = 
-  mapDoc (changeRM (`runReaderT` defaultParserConfig)) (parserR embedRM)
+  mapDoc 
+    (natR (`runReaderT` defaultParserConfig)) 
+    (parserR (pureR . embedR))
 
 parserR :: 
   forall e.
   ShowR e 
-  => Unfix e ~:> Monadic e P
-  -> Instance (Monadic e P)
-parserR DocMap {..} = Instance {..}
+  => Unfix e ~:> Apply P e
+  -> Monadic P e
+parserR app = Instance {..}
  where
-  getInl :: P (Inl e)
-  getInl = label "inline" $ overInl =<< choice
+  onInl :: P (Inl e)
+  onInl = label "inline" $ overInl app =<< choice
     [ char ',' $> Mark Comma
     , char ':' $> Mark Colon
     , char ';' $> Mark SemiColon
@@ -120,34 +125,34 @@ parserR DocMap {..} = Instance {..}
         points <- many (string "\\." $> ".")
         return . Number $ Text.concat (digits : parts) <> fromMaybe mempty str <> Text.concat points
     , Word <$> pWord
-    , Qouted <$> getQoutedSentences
+    , Qouted <$> onQoutedSentences
     ]
  
-  getQoutedSentences :: P (QoutedSentences e)
-  getQoutedSentences = try $ do
+  onQoutedSentences :: P (QoutedSentences e)
+  onQoutedSentences = try $ do
     qoutedType <- pStartQoute
-    qoutedSentences <- pushActiveQoute qoutedType getSentences
+    qoutedSentences <- pushActiveQoute qoutedType onSentences
     pEndQoute qoutedType
     return $ QoutedSentences { .. }
 
   -- | This parser will consume sentences and a final newline.
-  getSentences :: P (Sentences e)
-  getSentences = do
+  onSentences :: P (Sentences e)
+  onSentences = do
     inlines <- pInlines
     mEnds <- many pEnd
     case NE.nonEmpty mEnds of
       Nothing -> do
-        sen <- unMonadicSen . overSen $ OpenSentence inlines
+        sen <- overOpenSen app $ OpenSentence inlines
         return $ OpenSentences sen
       Just ends -> do
-        sen <- unMonadicSen . overSen $ ClosedSentence inlines ends
-        rest <- optional $ try (pInlineSep *> lookAhead getInl) *> getSentences
+        sen <- overClosedSen app $ ClosedSentence inlines ends
+        rest <- optional $ try (pInlineSep *> lookAhead onInl) *> onSentences
         return $ ClosedSentences sen rest
 
   pInlines :: P (NE.NonEmpty (Inl e))
   pInlines = do
-    i <- getInl
-    is <- many (try (pInlineSep *> getInl))
+    i <- onInl
+    is <- many (try (pInlineSep *> onInl))
     return $ i NE.:| is
 
   pEndQoute = \case

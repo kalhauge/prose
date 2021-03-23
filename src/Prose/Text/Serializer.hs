@@ -11,6 +11,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-missing-fields #-}
 module Prose.Text.Serializer where
 
 -- mtl
@@ -18,6 +20,8 @@ import Control.Monad.Reader
 
 -- base
 import Data.Foldable
+import Control.Category ((.))
+import Prelude hiding ((.))
 import Data.Functor.Contravariant
 import Data.List.NonEmpty qualified as NE
 import Data.Semigroup
@@ -69,16 +73,20 @@ instance DocR Serial where
   type Sec Serial = Int -> Serialized
   type Blk Serial = Serialized
   type Inl Serial = Serialized
-  type Sen Serial = SenValue Serialized
+  type OpenSen Serial = Serialized
+  type ClosedSen Serial = Serialized
 
-serialized :: ProjectableR e => SerializeHandler e -> Extractor e Text.Text
-serialized handler = contramapExtractor (serialize handler) $ Extractor {..}
+serialized :: ProjectableR e => 
+  SerializeHandler e 
+  -> Extractor Text.Text e
+serialized handler = extractor . serialize handler 
   where 
-    fromSec :: (Int -> Serialized) -> Text.Text
-    fromSec sn = LazyText.toStrict . Builder.toLazyText $ 
+    extractor :: Serial ~:> Value Text.Text 
+    extractor = DocMap $ Instance {..} 
+
+    onSec :: (Int -> Serialized) -> Text.Text
+    onSec sn = LazyText.toStrict . Builder.toLazyText $ 
       serializeWithConfig (sn 0) (SerialConfig 0 True)
-
-
 
 serialize :: ProjectableR e => SerializeHandler e -> e ~:> Serial
 serialize handler = cata (serializeR handler)
@@ -87,9 +95,9 @@ serializeR :: forall a e.
   a ~ Serial
   => SerializeHandler e
   -> Unfix a ~:> a
-serializeR SerializeHandler {..} = DocMap {..}
+serializeR SerializeHandler {} = DocMap $ Instance {..}
  where
-  overSec Section {..} n =
+  onSec Section {..} n =
     stimes n "#" <> " " <> singleline (sSentences sectionTitle) <> sEndLine
     <> (case NE.nonEmpty sectionContent of
       Just blks -> sEndLine <> fold blks
@@ -99,9 +107,9 @@ serializeR SerializeHandler {..} = DocMap {..}
 
   sSentences = \case
     OpenSentences sen ->
-      unSenValue sen
+      sen
     ClosedSentences s rest -> 
-      unSenValue s <> foldMap (\m -> sSentenceSep <> sSentences m) rest
+      s <> foldMap (\m -> sSentenceSep <> sSentences m) rest
 
   sSentenceSep = Serialized \cfg -> 
     if sCfgSingleLine cfg 

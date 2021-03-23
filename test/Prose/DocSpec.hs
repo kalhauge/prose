@@ -33,59 +33,52 @@ import Prose.Recursion
 spec :: Spec
 spec = return ()
 
-generate :: (EmbedableR e, MonadGen m) => InstanceM e m
+generate :: (EmbedableR e, MonadGen m) => Monadic m e
 generate = mapDoc 
-  (changeRM (`runReaderT` [minBound .. maxBound])) 
+  (runReaderTR [minBound .. maxBound])
   (generateR embedRM)
 
 generateR :: forall e m. 
   (MonadGen m, MonadReader [Qoute] m)
-  => Unfix e ~:> Monadic e m
-  -> Instance (Monadic e m)
+  => Unfix e ~:> Apply m e
+  -> Monadic m e
 generateR embed = Instance {..}
  where
-  DocMap 
-    { overSec = oSec
-    , overBlk = oBlk
-    , overInl = oInl
-    , overSen = oSen 
-    } = embed
-
-  getSec :: m (Sec e)
-  getSec = do
-    sectionTitle <- getSentences
-    sectionContent <- Gen.list (Range.linear 0 3) getBlk
+  onSec :: m (Sec e)
+  onSec = do
+    sectionTitle <- onSentences
+    sectionContent <- Gen.list (Range.linear 0 3) onBlk
     sectionSubs <- Gen.recursive Gen.choice
       [ pure [] ]
-      [ Gen.list (Range.singleton 1) getSec 
-      , Gen.list (Range.singleton 2) getSec
-      , Gen.list (Range.singleton 3) getSec
+      [ Gen.list (Range.singleton 1) onSec 
+      , Gen.list (Range.singleton 2) onSec
+      , Gen.list (Range.singleton 3) onSec
       ]
-    oSec $ Section { .. }
+    overSec embed $ Section { .. }
 
-  getBlk = oBlk =<< Gen.recursive Gen.choice
+  onBlk = overBlk embed =<< Gen.recursive Gen.choice
     [ Para 
-      <$> Gen.small getSentences
+      <$> Gen.small onSentences
     , Comment 
       <$> Gen.list (Range.linear 1 3) (Gen.text (Range.linear 0 4) Gen.alphaNum)
     ]
     [ Items 
       <$> Gen.nonEmpty (Range.linear 1 3) do
         em <- Gen.enumBounded
-        sens <- Gen.small getSentences
-        blocks <- Gen.list (Range.linear 0 3) getBlk
+        sens <- Gen.small onSentences
+        blocks <- Gen.list (Range.linear 0 3) onBlk
         return $ Item em Nothing sens blocks
     , OrderedItems 
       <$> Gen.enumBounded 
       <*> Gen.nonEmpty (Range.linear 1 3) do
-        sens <- Gen.small getSentences
-        blocks <- Gen.list (Range.linear 0 3) getBlk
+        sens <- Gen.small onSentences
+        blocks <- Gen.list (Range.linear 0 3) onBlk
         return $ OrderedItem Nothing sens blocks
     ]
 
-  getInl = do
+  onInl = do
     qoutes <- ask
-    oInl =<< Gen.recursive Gen.choice
+    overInl embed =<< Gen.recursive Gen.choice
       [ Mark <$> Gen.enumBounded
       , do
           c <- Gen.alpha
@@ -108,33 +101,31 @@ generateR embed = Instance {..}
           number <- Gen.text (Range.linear 1 n) Gen.digit
           pure $ Number number
       ]
-      [ Qouted <$> getQoutedSentences qoute | qoute <- qoutes ]
+      [ Qouted <$> onQoutedSentences qoute | qoute <- qoutes ]
 
 
-  getQoutedSentences qoute = do
-    sentences <- local (delete qoute) getSentences
+  onQoutedSentences qoute = do
+    sentences <- local (delete qoute) onSentences
     pure $ QoutedSentences qoute sentences
 
-  getSentences :: m (Sentences e)
-  getSentences = Gen.recursive Gen.choice
-    [ OpenSentences <$> unMonadicSen getOpenSen
-    , ClosedSentences <$> unMonadicSen getClosedSen <*> pure Nothing
+  onSentences :: m (Sentences e)
+  onSentences = Gen.recursive Gen.choice
+    [ OpenSentences <$> onOpenSen
+    , ClosedSentences <$> onClosedSen <*> pure Nothing
     ]
-    [ Gen.subtermM getSentences \a -> do
-        sens <- unMonadicSen getClosedSen
+    [ Gen.subtermM onSentences \a -> do
+        sens <- onClosedSen
         pure $ ClosedSentences sens (Just a)
     ]
 
-  getClosedSen :: MonadicSen e m 'Closed
-  getClosedSen = MonadicSen $ do 
+  onClosedSen = do 
     sen <- ClosedSentence
-      <$> Gen.nonEmpty (Range.linear 1 10) getInl
+      <$> Gen.nonEmpty (Range.linear 1 10) onInl
       <*> Gen.nonEmpty (Range.linear 1 3) Gen.enumBounded
-    unMonadicSen $ oSen sen
+    overClosedSen embed sen
 
-  getOpenSen :: MonadicSen e m 'Open
-  getOpenSen = MonadicSen $ do 
-    sen <- OpenSentence <$> Gen.nonEmpty (Range.linear 1 10) getInl
-    unMonadicSen $ oSen sen
+  onOpenSen = do
+    sen <- OpenSentence <$> Gen.nonEmpty (Range.linear 1 10) onInl
+    overOpenSen embed sen
 
 
