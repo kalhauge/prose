@@ -1,6 +1,6 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BlockArguments #-}
+-- {-# LANGUAGE RecordWildCards #-}
+-- {-# LANGUAGE OverloadedStrings #-}
+-- {-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 module Prose.Extension.ArticleSpec where
 

@@ -45,8 +45,8 @@ data SerialConfig = SerialConfig
   }
 
 data SerializeHandler e = SerializeHandler
-  { sCfgInlineSep :: Inl e -> Inl e -> Builder
-  , sCfgBlockSep :: Blk e -> Blk e -> Builder
+  { sCfgInlineSep :: Inl e -> Inl e -> Serialized
+  , sCfgBlockSep :: Blk e -> Blk e -> Serialized
   -- , sCfgCompressItem :: Item b i -> Maybe (ItemTree i)
   }
 
@@ -76,9 +76,28 @@ instance DocR Serial where
   type OpenSen Serial = Serialized
   type ClosedSen Serial = Serialized
 
+
+simpleSerialized :: Extractor Simple Text.Text
+simpleSerialized =
+  serialized SerializeHandler {..}
+ where
+  sCfgInlineSep _ (Inline' i) = case i of
+    Mark _ -> 
+      mempty
+    Qouted p
+      | fromQoutedSentences (getSum <$> cataA countSentences) p > 1 -> 
+          sSentenceSep
+    _ -> " "
+
+  sCfgBlockSep (Block' e) (Block' e') = case (e, e') of
+    (Items _, Items _) -> sEndLine <> sEndLine
+    (OrderedItems x1 _, OrderedItems x2 _)
+      | x1 == x2 -> sEndLine <> sEndLine
+    _ -> sEndLine
+
 serialized :: ProjectableR e => 
   SerializeHandler e 
-  -> Extractor Text.Text e
+  -> Extractor e Text.Text
 serialized handler = extractor . serialize handler 
   where 
     extractor :: Serial ~:> Value Text.Text 
@@ -111,17 +130,19 @@ serializeR SerializeHandler {} = DocMap $ Instance {..}
     ClosedSentences s rest -> 
       s <> foldMap (\m -> sSentenceSep <> sSentences m) rest
 
-  sSentenceSep = Serialized \cfg -> 
-    if sCfgSingleLine cfg 
-    then " "
-    else let Serialized x = sEndLine <> sIndent in x cfg
 
-  sIndent = Serialized \cfg -> 
-    stimesMonoid (sCfgIndent cfg) " "
+sEndLine :: Serialized
+sEndLine = "\n"
 
-  sEndLine :: Serialized
-  sEndLine = "\n"
+sIndent :: Serialized
+sIndent = Serialized \cfg -> 
+  stimesMonoid (sCfgIndent cfg) " "
 
+sSentenceSep :: Serialized
+sSentenceSep = Serialized \cfg -> 
+  if sCfgSingleLine cfg 
+  then " "
+  else let Serialized x = sEndLine <> sIndent in x cfg
 
 -- data SerialConfig b i = SerialConfig
 --   { sCfgInline :: Serializer b i i

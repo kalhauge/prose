@@ -1,17 +1,16 @@
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators #-}
 -- |
 --
 -- Parse a doc from Markdown.
@@ -46,6 +45,14 @@ import Text.Megaparsec.Debug qualified as DBG
 import Prose.Doc
 import Prose.Builder ()
 import Prose.Recursion
+
+defaultParser :: 
+  (ShowR e, EmbedableR e)
+  => Monadic Parser e
+defaultParser = 
+  mapDoc 
+    (natR (`runReaderT` defaultParserConfig)) 
+    (parserR (pureR . embedR))
 
 type Parser = Parsec Void Text.Text
 
@@ -87,14 +94,6 @@ pushActiveQoute ::
 pushActiveQoute qoute =
   local (\a -> a { pCfgActiveQoutes = qoute:pCfgActiveQoutes a })
 
-
-defaultParser :: 
-  (ShowR e, EmbedableR e)
-  => Monadic Parser e
-defaultParser = 
-  mapDoc 
-    (natR (`runReaderT` defaultParserConfig)) 
-    (parserR (pureR . embedR))
 
 parserR :: 
   forall e.

@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE BlockArguments #-}
@@ -59,11 +58,11 @@ specInline = describe "inline" do
   ex "ex\\." $ Word "ex."
   ex "@ref" $ Reference "ref"
 
-  -- describe "simple inlines" do
-  --   serializeRoundtrip @Simple
-  --     (onInl generate)
-  --     (onInl serialized)
-  --     (onInl parser)
+  focus $ describe "simple inlines" do
+    serializeRoundtrip @Inline'
+      (onInl (generate @Simple))
+      (overInl simpleSerialized)
+      (onInl (defaultParser @Simple))
 
   -- describe "simple sentences" do
   --   serializeRoundtrip

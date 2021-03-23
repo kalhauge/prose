@@ -1,19 +1,23 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module Prose.Simple where
 
 -- base
--- import Data.Monoid
--- import Text.Show
+import Text.Show
+import Control.Category 
+import Prelude hiding ((.), id)
+import Data.Monoid
+import Data.List.NonEmpty qualified as NE
+
+-- text 
+import Data.Text qualified as Text
 
 import Prose.Doc
 import Prose.Recursion
@@ -74,70 +78,82 @@ instance EmbedableR Simple where
     , onClosedSen = id
     }
 
-showSimple :: Extractor (Int -> ShowS) Simple 
-showSimple = undefined
+showSimple :: Extractor Simple (Int -> ShowS)
+showSimple = extractR showDoc
 
--- countSimpleSentences :: Extractor Simple Int
--- countSimpleSentences = 
---   getSum <$> toExtractor (cata (fromAlgebra countSentences))
--- 
--- countSimpleWords :: Extractor Simple Int
--- countSimpleWords = 
---   getSum <$> toExtractor (cata (fromAlgebra countWords))
+countSimpleSentences :: Extractor Simple Int
+countSimpleSentences = 
+  mapV getSum . extractR countSentences
 
+countSimpleWords :: Extractor Simple Int
+countSimpleWords = 
+  mapV getSum . extractR countWords
 
 -- instance Show Section' where
 --   showsPrec n (Section' s) =
 --     showParen (n > app_prec) (showString "Section' " . showsPrec (app_prec + 1) s)
 --    where app_prec = 10
 
--- -- | A default fold, should be overloaded
--- showDoc :: DocAlgebra (Value (Int -> ShowS)) (Int -> ShowS)
--- showDoc = DocAlgebra {..}
---  where
---   fromSection Section {..} n = 
---     showParen (n > app_prec) 
---     $ showString "sec' " 
---     . fromSentences sectionTitle (app_prec + 1) 
---     . showChar ' ' . showListWith ($ 0) sectionContent
---     . showChar ' ' . showListWith ($ 0) sectionSubs
--- 
---   fromBlock blk = const $ shows ()
---     -- case blk of
---     --   Para s -> 
---     --     showParen (n > app_prec) 
---     --     . showString "para'"
---     --   Comment _ -> mempty
---     --   Items its -> 
---     --     foldMap fromItem its
---     --   OrderedItems _ its -> 
---     --     foldMap fromOrderedItem its
--- 
---   fromItem Item {} = const $ shows ()
---     -- fromSentences itemTitle 
---     -- <> fold itemContents
--- 
---   fromOrderedItem OrderedItem {..} = const $ shows ()
---     -- fromSentences orderedItemTitle
---     -- <> fold orderedItemContents
--- 
---   fromInline i n = showParen (n > app_prec) $ case i of
---     Word w -> showString "word' " . shows w
---     Qouted q -> fromQoutedSentences q i
--- 
--- 
---   fromQoutedSentences q = const $ shows ()
--- 
---   fromSentences sens = const $ shows ()
--- 
---   -- \case
---   --   OpenSentences (SenValue sen) -> sen
---   --   ClosedSentences (SenValue sen) rest -> sen <> foldMap fromSentences rest
--- 
---   -- fromSentence :: forall b. Sentence (Value m) b -> m
---   fromSentence sen = const $ shows ()
--- 
---   app_prec = 10
+-- | A default fold, should be overloaded
+showDoc :: DocAlgebra (Value (Int -> ShowS)) (Int -> ShowS)
+showDoc = DocAlgebra {..}
+ where
+  fromSection Section {..} n = 
+    showParen (n > app_prec) 
+    $ showString "sec' " 
+    . fromSentences sectionTitle (app_prec + 1) 
+    . showChar ' ' . showListWith ($ 0) sectionContent
+    . showChar ' ' . showListWith ($ 0) sectionSubs
+
+  fromBlock blk n = case blk of
+    Para s -> 
+      showParen (n > app_prec) 
+      $ showString "para' "
+      . fromSentences s (app_prec + 1)
+    Comment x -> 
+      showParen (n > app_prec) 
+      $ showString "comment' "
+        . shows (Text.intercalate "\n" x)
+    Items its -> 
+      showParen (n > app_prec) 
+      $ showString "items' "
+      . showListWith (`fromItem` n) (NE.toList its)
+    OrderedItems x its -> 
+      showParen (n > app_prec) 
+      $ showString "ordered' "
+      . shows x
+      . showChar ' '
+      . showListWith (`fromOrderedItem` n) (NE.toList its)
+
+  fromItem Item {} = const $ shows ()
+    -- fromSentences itemTitle 
+    -- <> fold itemContents
+
+  fromOrderedItem OrderedItem {} = const $ shows ()
+    -- fromSentences orderedItemTitle
+    -- <> fold orderedItemContents
+
+  fromInline i n = showParen (n > app_prec) $ case i of
+    Word w -> showString "word' " . shows w
+    Reference w -> showString "ref' " . shows w
+    Verbatim w -> showString "verb' " . shows w
+    Number w -> showString "num' " . shows w
+    Mark m -> showString "mark' " . shows m
+    Qouted q -> fromQoutedSentences q i
+
+
+  fromQoutedSentences _ = const $ shows ()
+
+  fromSentences _ = const $ shows ()
+
+  -- \case
+  --   OpenSentences (SenValue sen) -> sen
+  --   ClosedSentences (SenValue sen) rest -> sen <> foldMap fromSentences rest
+
+  -- fromSentence :: forall b. Sentence (Value m) b -> m
+  fromSentence _ = const $ shows ()
+
+  app_prec = 10
 -- 
 
 -- instance ShowR e => Show (SentenceBuilder e) where

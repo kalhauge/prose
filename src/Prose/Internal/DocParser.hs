@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE BlockArguments #-}
+-- {-# LANGUAGE ImportQualifiedPost #-}
+-- {-# LANGUAGE FlexibleInstances #-}
+-- {-# LANGUAGE LambdaCase #-}
+-- {-# LANGUAGE BlockArguments #-}
 module Prose.Internal.DocParser where
 
 -- -- base

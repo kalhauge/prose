@@ -1,8 +1,7 @@
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE GADTs #-}
+-- {-# LANGUAGE RankNTypes #-}
+-- {-# LANGUAGE RecordWildCards #-}
+-- {-# LANGUAGE ApplicativeDo #-}
+-- {-# LANGUAGE GADTs #-}
 module Prose where
 
 -- -- base
