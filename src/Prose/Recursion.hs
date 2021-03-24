@@ -115,6 +115,31 @@ liftR fn = DocMap $ Instance fn fn fn fn fn
 unliftR :: forall e m. (forall a. m a -> a) -> Apply m e ~:> e 
 unliftR fn = DocMap $ Instance fn fn fn fn fn
 
+joinR :: Monad m => Apply m (Apply m e) ~:> Apply m e
+joinR = DocMap $ Instance join join join join join
+
+underR :: Functor m => (a ~:> b) -> (Apply m a ~:> Apply m b)
+underR amb = DocMap $ Instance 
+  { onSec = fmap $ overSec amb 
+  , onBlk = fmap $ overBlk amb 
+  , onInl = fmap $ overInl amb 
+  , onOpenSen = fmap $ overOpenSen amb 
+  , onClosedSen = fmap $ overClosedSen amb 
+  }
+
+bindR :: Monad m 
+  => (a ~:> Apply m b) 
+  -> (b ~:> Apply m c) 
+  -> (a ~:> Apply m c)
+bindR amb bmc = DocMap $ Instance 
+  { onSec = overSec amb >=> overSec bmc 
+  , onBlk = overBlk amb >=> overBlk bmc
+  , onInl = overInl amb >=> overInl bmc
+  , onOpenSen = overOpenSen amb >=> overOpenSen bmc
+  , onClosedSen = overClosedSen amb >=> overClosedSen bmc
+  }
+
+
 pureR :: Applicative m => e ~:> Apply m e
 pureR = liftR pure
 
@@ -418,39 +443,24 @@ instance Functor m => DocFunctor (DocCoAlgebra m) where
 
 type Generator m e = Monadic m e 
 
-joinR :: Monad m => Apply m (Apply m e) ~:> Apply m e
-joinR = DocMap $ Instance join join join join join
-
-underR :: Functor m => (a ~:> b) -> (Apply m a ~:> Apply m b)
-underR amb = DocMap $ Instance 
-  { onSec = fmap $ overSec amb 
-  , onBlk = fmap $ overBlk amb 
-  , onInl = fmap $ overInl amb 
-  , onOpenSen = fmap $ overOpenSen amb 
-  , onClosedSen = fmap $ overClosedSen amb 
-  }
-
-bindR :: Monad m 
-  => (a ~:> Apply m b) 
-  -> (b ~:> Apply m c) 
-  -> (a ~:> Apply m c)
-bindR amb bmc = DocMap $ Instance 
-  { onSec = overSec amb >=> overSec bmc 
-  , onBlk = overBlk amb >=> overBlk bmc
-  , onInl = overInl amb >=> overInl bmc
-  , onOpenSen = overOpenSen amb >=> overOpenSen bmc
-  , onClosedSen = overClosedSen amb >=> overClosedSen bmc
-  }
-
 anaA :: forall e m. 
   Monad m 
   => (Unfix e ~:> Apply m e)
   -> (Generator m e -> DocCoAlgebra m e) 
-  -> Generator m e
-anaA emb fn = gen
+  -> (Generator m e, DocCoAlgebra m e)
+anaA emb fn = (gen, alg)
  where
-  DocCoAlgebra {..} = fn gen
-  gen = mapDoc (joinR . underR emb) generator
+  alg@DocCoAlgebra {..} = fn gen
+  gen = fromCoAlgebra emb (DocCoAlgebra {..})
+
+fromCoAlgebra :: 
+  Monad m
+  => (Unfix e ~:> Apply m e)
+  -> DocCoAlgebra m e 
+  -> Generator m e
+fromCoAlgebra emb DocCoAlgebra {..} = 
+  mapDoc (joinR . underR emb) generator
+ where
   generator = Instance 
    { onSec = toSection
    , onBlk = toBlock

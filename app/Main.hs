@@ -3,5 +3,5 @@ module Main where
 import Prose
 
 main :: IO ()
-main = Prose.app
+main = return () -- Prose.app
 

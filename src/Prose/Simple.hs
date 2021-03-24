@@ -139,19 +139,38 @@ showDoc = DocAlgebra {..}
     Verbatim w -> showString "verb' " . shows w
     Number w -> showString "num' " . shows w
     Mark m -> showString "mark' " . shows m
-    Qouted q -> fromQoutedSentences q i
+    Qouted q -> fromQoutedSentences q n
 
 
-  fromQoutedSentences _ = const $ shows ()
+  fromQoutedSentences (QoutedSentences qute sen) n = 
+    showParen (n > app_prec) 
+    $ showString str 
+    . fromSentences sen (app_prec + 1) 
+   where
+     str = case qute of
+       Brackets -> "brackets' "
+       Parenthesis -> "parens' "
+       DoubleQoute -> "dqoute' "
+       Emph -> "emph' "
+       Strong -> "strong' "
 
-  fromSentences _ = const $ shows ()
+  fromSentences sens n = case sens of
+    OpenSentences sen' -> 
+      sen' n
+    ClosedSentences sen' rest -> 
+      sen' n . maybe (const id) fromSentences rest n
 
-  -- \case
-  --   OpenSentences (SenValue sen) -> sen
-  --   ClosedSentences (SenValue sen) rest -> sen <> foldMap fromSentences rest
-
-  -- fromSentence :: forall b. Sentence (Value m) b -> m
-  fromSentence _ = const $ shows ()
+  fromSentence :: forall b. Sentence b (Value (Int -> ShowS)) -> Int -> ShowS
+  fromSentence sen n = case sen of 
+    OpenSentence inlines' -> 
+      showParen (n > app_prec) 
+      $ showString "open " 
+      . showListWith ($0) (NE.toList inlines')
+    ClosedSentence inlines' end -> 
+      showParen (n > app_prec) 
+      $ showString "closed " 
+      . showListWith (\(x :: Int -> ShowS) -> x 0) (NE.toList inlines')
+      . showsPrec (app_prec + 1) (NE.toList end)
 
   app_prec = 10
 -- 

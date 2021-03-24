@@ -94,6 +94,10 @@ serializeSimple = f <$> ser x
     . Builder.toLazyText 
     $ serializeWithConfig a (SerialConfig 0 True 1)
 
+serializeSimpleR :: Extractor Simple Text.Text
+serializeSimpleR =
+  serialized simpleHandler
+
 simpleHandler :: SerializeHandler Simple
 simpleHandler = SerializeHandler {..}
  where
@@ -111,9 +115,6 @@ simpleHandler = SerializeHandler {..}
       | x1 == x2 -> sEndLine <> sEndLine
     _ -> sEndLine
 
-simpleSerialized :: Extractor Simple Text.Text
-simpleSerialized =
-  serialized simpleHandler
 
 serialized :: ProjectableR e => 
   SerializeHandler e 

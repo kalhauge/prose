@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -10,7 +11,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
 -- |
 --
 -- Parse a doc from Markdown.
@@ -22,7 +22,7 @@ import Control.Monad.Reader
 -- base
 import Data.Void
 import Control.Category
-import Prelude hiding ((.))
+import Prelude hiding ((.), id)
 import Data.Maybe
 import Data.Functor
 import Data.List qualified as L
@@ -46,17 +46,13 @@ import Prose.Simple
 import Prose.Builder ()
 import Prose.Recursion
 
+parseSimple :: DocCoAlgebra Parser Simple
+parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) alg
+ where
+  (_, alg) = anaA embedRM (parserR (fmap $ overSec embedR))
 
--- parseSimple :: DocCoAlgebra Parser Simple
--- parseSimple =
---     (parserR (pureR . embedR))
-
--- defaultParser :: 
---   (ShowR e, EmbedableR e)
---   => Monadic Parser e
--- defaultParser = 
---   natCoAlgebra (`runReaderT` defaultParserConfig)) 
---     parserR embedRM
+parseSimpleR :: Generator Parser Simple
+parseSimpleR = fromCoAlgebra embedRM parseSimple
 
 type Parser = Parsec Void Text.Text
 
@@ -99,24 +95,18 @@ pushActiveQoute ::
 pushActiveQoute qoute =
   local (\a -> a { pCfgActiveQoutes = qoute:pCfgActiveQoutes a })
 
-parseSimple :: DocCoAlgebra Parser Simple
-parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) gen
- where
-  gen = parserR (anaA embedRM parserR)
+indent :: P a -> P a
+indent = local (\a -> a { pCfgIndent = pCfgIndent a + 1 })
 
-defaultParser :: (ShowR e, EmbedableR e) 
-  => Generator Parser e
-defaultParser = 
-  mapDoc (runReaderTR defaultParserConfig) 
-  $ anaA embedRM parserR
+singleline :: P a -> P a
+singleline = local (\a -> a { pCfgSingleLineSentences = True })
 
 parserR :: 
-  forall e.  ShowR e 
-  -- => Unfix e ~:> Apply P e
-  -- -> Monadic P e
-  => Generator P e
+  forall e. ShowR e 
+  => (P (Section e) -> P (Sec e))
+  -> Generator P e
   -> DocCoAlgebra P e
-parserR app = DocCoAlgebra {..}
+parserR pSec app = DocCoAlgebra {..}
  where
   toInline = label "inline" $ choice
     [ char ',' $> Mark Comma
@@ -155,7 +145,7 @@ parserR app = DocCoAlgebra {..}
   toSentences :: P (Sentences e)
   toSentences = choice 
     [ do
-      sen <- onClosedSen app 
+      sen <- try $ onClosedSen app 
       rest <- optional 
         $ try (pInlineSep *> lookAhead (onInl app)) 
           *> toSentences
@@ -165,11 +155,19 @@ parserR app = DocCoAlgebra {..}
       return $ OpenSentences sen
     ]
 
-  -- pInlines :: P (NE.NonEmpty (Inl e))
-  -- pInlines = do
-  --   i <- onInl app
-  --   is <- many (try (pInlineSep *> onInl app))
-  --   return $ i NE.:| is
+  toOpenSentence = 
+    OpenSentence <$> pInlines
+  
+  toClosedSentence = do
+    inlines <- pInlines
+    ends <- some pEnd
+    return $ ClosedSentence inlines ends
+
+  pInlines :: P (NE.NonEmpty (Inl e))
+  pInlines = do
+    i <- onInl app
+    is <- many (try (pInlineSep *> onInl app))
+    return $ i NE.:| is
 
   pEndQoute = \case
     Brackets -> void $ label "end of bracket (])" (char ']')
@@ -187,10 +185,6 @@ parserR app = DocCoAlgebra {..}
   pInlineSep = asks pCfgSingleLineSentences >>= \case
     True -> hspace
     False -> hspace <* optional (eol *> pIndent)
-
-  pIndent = do
-    n <- asks pCfgIndent
-    label ("identation (" ++ show n ++ ")") $ void $ count n (char ' ')
 
   pStartQoute = try $ do
     x <- choice
@@ -218,10 +212,6 @@ parserR app = DocCoAlgebra {..}
       ]
     return $ Text.cons c (Text.concat txt)
 
-  -- pBlocks :: Show b => Parser b i (NE.NonEmpty b)
-  pBlocks = label "blocks" $
-    some (try (many pEmptyLine *> pIndent) *> onBlk app)
-  
   -- | Parses a single block
   -- pBlock :: X b i => Parser b i (Block b i)
   toBlock = label "block" do
@@ -236,65 +226,99 @@ parserR app = DocCoAlgebra {..}
     orderedItems = label "ordered items" $ choice
       [ do
           _ <- lookAhead pNumeralType
-          i <- pNumeralItem
+          i <- toNumeralItem
           is <- many 
-              (try (optional pEmptyLine *> pIndent *> lookAhead pNumeralType) *> pNumeralItem)
+            (try (optional pEmptyLine 
+                *> pIndent 
+                *> lookAhead pNumeralType) 
+                *> toNumeralItem)
           return $ OrderedItems Numeral (i NE.:| is)
       ]
-  
+
     comment = label "comment" do
       t <- commentLine
       ts <- many (try (eol *> pIndent *> commentLine))
       void eol <|> void eof
       return $ Comment (t:ts)
-  
+
     commentLine = label "comment line" do
       string "--" *> takeWhileP (Just "a comment line") (/= '\n')
-  
+
     para = label "paragraph" do
       s <- toSentences
       hspace <* eol <|> eof
       return $ Para s
-  
+
     items = label "items" do
-      i <- item
-      is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> item)
+      i <- toItem
+      is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> toItem)
       return $ Items (i NE.:| is)
-  
-    pItemType = label "an item ('-', '*', or '+')" $ choice
-      [ char '-' $> Minus
-      , char '+' $> Plus
-      , char '*' $> Times
-      ] <* hspace1
-  
-    item = label "item" do
-      itemType <- try (hspace *> pItemType)
-      let itemTodo = Nothing
-      indent do
-        itemTitle <- pSentences
-        dbg "empty" (eof <|> pEmptyLine)
-        itemContents <- label "item content" $ choice
-          [ NE.toList <$> pBlocks
-          , pure []
-          ]
-        pure $ Item {..}
-  
-    pNumeralType = try (takeWhile1P Nothing isNumber <* char ')') <* hspace1
-  
-    pNumeralItem = label "numeral item" do
-      _ <- pNumeralType
-      let orderedItemTodo = Nothing
-      indent do
-        orderedItemTitle <- pSentences
-        dbg "empty" (eof <|> pEmptyLine)
-        orderedItemContents <- label "item content" $ choice
-          [ NE.toList <$> pBlocks
-          , pure []
-          ]
-        pure $ OrderedItem {..}
 
-  pEmptyLine = label "empty line" . try .  void $ hspace *> eol
+  toOrderedItem = choice 
+    [ toNumeralItem ]
 
+  toNumeralItem = label "numeral item" do
+    _ <- pNumeralType
+    let orderedItemTodo = Nothing
+    indent do
+      orderedItemTitle <- toSentences
+      dbg "empty" (eof <|> pEmptyLine)
+      orderedItemContents <- label "item content" $ choice
+        [ NE.toList <$> pBlocks app
+        , pure []
+        ]
+      pure $ OrderedItem {..}
+
+  pNumeralType = 
+    try (takeWhile1P Nothing isNumber <* char ')') 
+    <* hspace1
+
+  toItem = label "item" do
+    itemType <- try (hspace *> pItemType)
+    let itemTodo = Nothing
+    indent do
+      itemTitle <- toSentences
+      dbg "empty" (eof <|> pEmptyLine)
+      itemContents <- label "item content" $ choice
+        [ NE.toList <$> pBlocks app
+        , pure []
+        ]
+      pure $ Item {..}
+
+  pItemType = label "an item ('-', '*', or '+')" $ choice
+    [ char '-' $> Minus
+    , char '+' $> Plus
+    , char '*' $> Times
+    ] <* hspace1
+
+  toSection :: P (Section e)
+  toSection = 
+    pDoc pSec pSection
+
+  pSection = do
+    sectionTitle <- label "section header" $ singleline toSentences
+    choice
+      [ do
+          let sectionContent = []
+          dbg "eof" eof
+          return $ \sectionSubs -> Section { .. }
+      , do
+          _ <- many pEmptyLine
+          sectionContent <- maybe [] NE.toList 
+            <$> optional (pBlocks app)
+          return $ \sectionSubs -> Section { ..  }
+      ]
+
+pIndent :: P ()
+pIndent = do
+  n <- asks pCfgIndent
+  label ("identation (" ++ show n ++ ")") $ void $ count n (char ' ')
+
+pBlocks ::ShowR e => Generator P e -> P (NE.NonEmpty (Blk e))
+pBlocks app = label "blocks" $
+  some (try (many pEmptyLine *> pIndent) *> onBlk app)
+
+  
 -- data ParserConfig b i = ParserConfig
 --   { pCfgParseB :: Parser b i b
 --   , pCfgParseI :: Parser b i i
@@ -395,95 +419,75 @@ parserR app = DocCoAlgebra {..}
 -- -- Sentence
 -- 
 -- 
--- 
--- -- Sections
--- 
--- -- | Seperate the file into unparsed sections. This is usefull to
--- -- make parseing more lazy.
--- pSectionText :: forall b i. Parser b i (NE.NonEmpty (Int, State Text.Text Void))
--- pSectionText = go id
--- 
---  where
---   go :: (NE.NonEmpty (Int, State Text.Text Void) -> a)
---     -> Parser b i a
---   go k = do
---     header <- Text.length <$> takeWhile1P (Just "header") (== '#')
---     hspace
---     st <- getParserState
---     txt <- Text.intercalate "\n" <$> linesUntilNext id
---     let item = (header, st {stateInput = txt})
---     choice
---       [ go (k . (item NE.<|))
---       , return (k $ item NE.:| [])
---       ]
--- 
---   linesUntilNext :: ([Text.Text] -> a) -> Parser b i a
---   linesUntilNext k = do
---     txt <- takeWhileP Nothing (/= '\n')
---     void eol <|> eof
---     choice
---       [ do
---           lookAhead (void (char '#') <|> eof)
---           return (k [txt])
---       , do
---           linesUntilNext (k . (txt:))
---       ]
--- 
--- type PState = State Text.Text Void
--- 
--- pDoc :: forall b i s. Show s => Parser b i ([s] -> s) -> Parser b i s
--- pDoc pS = do
---   x NE.:| rest <- pSectionText
---   case pRec x rest of
---     (p, []) -> p
---     (_, (_, s):_) -> do
---       setParserState s
---       fail "unexpected header"
---  where
---   pRec ::
---       (Int, PState)
---       -> [(Int, PState)]
---       -> (Parser b i s, [(Int, PState)])
---   pRec (n, s) x = (label "section" p, others)
---    where
---     (subs, others) = span (\(n', _) -> n < n') x
---     p = do
---       setParserState s
---       p' <- pS
---       subs' <- sequence $ split subs
---       return (p' subs')
--- 
---     split :: [(Int, State Text.Text Void)] -> [Parser b i s]
---     split = \case
---       [] -> []
---       a:rest ->
---         let (p', x') = pRec a rest
---         in p':split x'
--- 
--- pSection :: X b i => Parser b i ([s] -> Section s b i)
--- pSection = do
---   sectionTitle <- label "section header" $ oneline pSentences
---   choice
---     [ do
---         let sectionContent = []
---         dbg "eof" eof
---         return $ \sectionSubs -> Section { .. }
---     , do
---         _ <- many pEmptyLine
---         sectionContent <- maybe [] NE.toList <$> optional pBlocks
---         return $ \sectionSubs -> Section { ..  }
---     ]
--- 
--- pSimpleDoc :: SimpleParser Section'
--- pSimpleDoc = pDoc ((Section' .) <$> pSection) <* eof
--- 
--- type SimpleParser =
---   Parser Block' Inline'
--- 
--- 
--- runSimpleParser ::
---   SimpleParser a
---   -> Text.Text
---   -> Either (ParseErrorBundle Text.Text Void) a
--- runSimpleParser p txt =
---   runReader (runParserT (runMyParser p) "" txt) simplePaserConfig
+
+-- Sections
+
+-- | Seperate the file into unparsed sections. This is usefull to
+-- make parseing more lazy.
+pSectionText :: P (NE.NonEmpty (Int, State Text.Text Void))
+pSectionText = go id
+
+ where
+  go :: (NE.NonEmpty (Int, State Text.Text Void) -> a) -> P a
+  go k = do
+    header <- Text.length <$> takeWhile1P (Just "header") (== '#')
+    hspace
+    st <- getParserState
+    txt <- Text.intercalate "\n" <$> linesUntilNext id
+    let item = (header, st {stateInput = txt})
+    choice
+      [ go (k . (item NE.<|))
+      , return (k $ item NE.:| [])
+      ]
+
+  linesUntilNext :: ([Text.Text] -> a) -> P a
+  linesUntilNext k = do
+    txt <- takeWhileP Nothing (/= '\n')
+    void eol <|> eof
+    choice
+      [ do
+          lookAhead (void (char '#') <|> eof)
+          return (k [txt])
+      , do
+          linesUntilNext (k . (txt:))
+      ]
+
+type PState = State Text.Text Void
+
+pDoc :: forall e. ShowR e 
+  => (P (Section e) -> P (Sec e))
+  -> P ([Sec e] -> Section e) 
+  -> P (Section e)
+pDoc pLf pS = do
+  x NE.:| rest <- pSectionText
+  case pRec x rest of
+    (p, []) -> p
+    (_, (_, s):_) -> do
+      setParserState s
+      fail "unexpected header"
+ where
+  pRec ::
+      (Int, PState)
+      -> [(Int, PState)]
+      -> (P (Section e), [(Int, PState)])
+  pRec (n, s) x = (label "section" p, others)
+   where
+    (subs, others) = span (\(n', _) -> n < n') x
+    p = do
+      setParserState s
+      p' <- pS
+      subs' <- sequence $ split subs
+      pure (p' subs')
+
+  split :: [(Int, State Text.Text Void)] -> [P (Sec e)]
+  split = \case
+    [] -> []
+    a:rest ->
+      let (p', x') = pRec a rest
+      in pLf p':split x'
+
+pEmptyLine :: P ()
+pEmptyLine = label "empty line" 
+  . try . void 
+  $ hspace *> eol
+

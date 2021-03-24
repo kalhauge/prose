@@ -32,14 +32,12 @@ spec :: Spec
 spec = return ()
 
 genSimple :: MonadGen m => DocCoAlgebra m Simple
-genSimple = natCoAlgebra (`runReaderT` [minBound..maxBound]) gen
+genSimple = natCoAlgebra (`runReaderT` [minBound..maxBound]) alg
  where
-  gen = generateR (anaA embedRM generateR)
+  (_, alg) = anaA embedRM generateR
 
-generate :: (EmbedableR e, MonadGen m) => Generator m e
-generate = 
-  mapDoc (runReaderTR [minBound..maxBound]) 
-  $ anaA embedRM generateR
+genSimpleR :: MonadGen m => Generator m Simple
+genSimpleR = fromCoAlgebra embedRM genSimple
 
 generateR :: forall e m. 
   (MonadGen m, MonadReader [Qoute] m)
