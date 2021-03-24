@@ -70,7 +70,7 @@ singleline (Serialized ser) = Serialized \cfg ->
 
 indent :: Serialized -> Serialized
 indent (Serialized ser) = Serialized \cfg -> 
-  ser (cfg { sCfgIndent = sCfgIndent cfg + 1 })
+  ser (cfg { sCfgIndent = sCfgIndent cfg + 2 })
 
 increaseHeader :: Serialized -> Serialized
 increaseHeader (Serialized ser) = Serialized \cfg -> 
@@ -92,7 +92,7 @@ serializeSimple = f <$> ser x
   ser = serializeX simpleHandler
   f a = LazyText.toStrict 
     . Builder.toLazyText 
-    $ serializeWithConfig a (SerialConfig 0 True 1)
+    $ serializeWithConfig a (SerialConfig 0 False 1)
 
 serializeSimpleR :: Extractor Simple Text.Text
 serializeSimpleR =
@@ -122,7 +122,7 @@ serialized :: ProjectableR e =>
 serialized handler = mapV f . serialize handler 
   where 
     f x = LazyText.toStrict . Builder.toLazyText $ 
-      serializeWithConfig x (SerialConfig 0 True 1)
+      serializeWithConfig x (SerialConfig 0 False 1)
 
 serialize :: ProjectableR e 
   => SerializeHandler e 
@@ -158,21 +158,6 @@ sEscapedEnd txt = Serialized \_ ->
   let normal = Text.dropWhileEnd (== '.') txt
   in Builder.fromText normal <>
     stimesMonoid (Text.length txt - Text.length normal) "\\."
-
--- serializeR :: forall a e. 
---   a ~ Serial
---   => SerializeHandler e
---   -> Unfix a ~:> a
--- serializeR SerializeHandler {} = DocMap $ Instance {..}
---  where
---   onSec Section {..} n =
---     stimes n "#" <> " " <> singleline (sSentences sectionTitle) <> sEndLine
---     <> (case NE.nonEmpty sectionContent of
---       Just blks -> sEndLine <> fold blks
---       Nothing -> mempty
---     )
---     <> foldMap (\s -> sEndLine <> s (n+1)) sectionSubs
-
 
 serializeX :: forall e.
     SerializeHandler e 

@@ -96,7 +96,7 @@ pushActiveQoute qoute =
   local (\a -> a { pCfgActiveQoutes = qoute:pCfgActiveQoutes a })
 
 indent :: P a -> P a
-indent = local (\a -> a { pCfgIndent = pCfgIndent a + 1 })
+indent = local (\a -> a { pCfgIndent = pCfgIndent a + 2 })
 
 singleline :: P a -> P a
 singleline = local (\a -> a { pCfgSingleLineSentences = True })
