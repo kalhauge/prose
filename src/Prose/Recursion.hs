@@ -464,13 +464,31 @@ anaA emb fn = (gen, alg)
   alg@DocCoAlgebra {..} = fn gen
   gen = fromCoAlgebra emb (DocCoAlgebra {..})
 
+anaA' :: forall e m. 
+  Monad m 
+  => (Apply m (Unfix e) ~:> Apply m e)
+  -> (Generator m e -> DocCoAlgebra m e) 
+  -> (Generator m e, DocCoAlgebra m e)
+anaA' emb fn = (gen, alg)
+ where
+  alg@DocCoAlgebra {..} = fn gen
+  gen = fromCoAlgebra' emb (DocCoAlgebra {..})
+
 fromCoAlgebra :: 
   Monad m
   => (Unfix e ~:> Apply m e)
   -> DocCoAlgebra m e 
   -> Generator m e
-fromCoAlgebra emb DocCoAlgebra {..} = 
-  mapDoc (joinR . underR emb) generator
+fromCoAlgebra emb = 
+  fromCoAlgebra' (joinR . underR emb) 
+
+fromCoAlgebra' :: 
+  Monad m
+  => (Apply m (Unfix e) ~:> Apply m e)
+  -> DocCoAlgebra m e 
+  -> Generator m e
+fromCoAlgebra' emb DocCoAlgebra {..} = 
+  mapDoc emb generator
  where
   generator = Instance 
    { onSec = toSection

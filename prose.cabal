@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 06454da82ccad1c007c4d37105fa12538be4a377e4524af41f4b88f52f061fa8
+-- hash: a868a0e4c014b676a6f8bc6e49cd1510a865142281cdf131077615114080471e
 
 name:           prose
 version:        0.1.0.0
@@ -29,6 +29,7 @@ source-repository head
 library
   exposed-modules:
       Prose
+      Prose.Annotated
       Prose.Builder
       Prose.Builder.TH
       Prose.Doc

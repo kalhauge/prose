@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -45,6 +46,7 @@ import Prose.Doc
 import Prose.Simple
 import Prose.Builder ()
 import Prose.Recursion
+import Prose.Annotated
 
 parseSimple :: DocCoAlgebra Parser Simple
 parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) alg
@@ -53,6 +55,30 @@ parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) alg
 
 parseSimpleR :: Generator Parser Simple
 parseSimpleR = fromCoAlgebra embedRM parseSimple
+
+parseAnnotated :: DocCoAlgebra Parser (Ann SourcePos)
+parseAnnotated = natCoAlgebra (`runReaderT` defaultParserConfig) alg
+ where
+  (_, alg) = anaA' annotate (parserR (overSec annotate))
+
+  annotate :: Apply P (Unfix (Ann SourcePos)) ~:> Apply P (Ann SourcePos)
+  annotate = DocMap $ Instance 
+    { onSec = \pSec -> do 
+        pos <- getSourcePos
+        AnnSection pos <$> pSec
+    , onBlk = \pBlk -> do 
+        pos <- getSourcePos
+        AnnBlock pos <$> pBlk
+    , onInl = \pInl -> do 
+        pos <- getSourcePos
+        AnnInline pos <$> pInl
+    , onOpenSen = \pSen -> do 
+        pos <- getSourcePos
+        AnnSentence pos <$> pSen
+    , onClosedSen = \pSen -> do 
+        pos <- getSourcePos
+        AnnSentence pos <$> pSen
+    }
 
 type Parser = Parsec Void Text.Text
 
@@ -212,8 +238,6 @@ parserR pSec app = DocCoAlgebra {..}
       ]
     return $ Text.cons c (Text.concat txt)
 
-  -- | Parses a single block
-  -- pBlock :: X b i => Parser b i (Block b i)
   toBlock = label "block" do
     choice
       [ comment
@@ -317,108 +341,6 @@ pIndent = do
 pBlocks ::ShowR e => Generator P e -> P (NE.NonEmpty (Blk e))
 pBlocks app = label "blocks" $
   some (try (many pEmptyLine *> pIndent) *> onBlk app)
-
-  
--- data ParserConfig b i = ParserConfig
---   { pCfgParseB :: Parser b i b
---   , pCfgParseI :: Parser b i i
---   , pCfgActiveQoutes :: [Qoute]
---   , pCfgIndent :: Int
---   , pCfgSingleLineSentences :: Bool
---   , pCfgDepth :: Maybe [String]
---   }
--- 
--- type P b i = ParsecT Void Text.Text (Reader (ParserConfig b i))
--- 
--- newtype Parser b i a = Parser { runMyParser :: P b i a }
--- 
--- deriving via (P b i) instance MonadReader (ParserConfig b i) (Parser b i)
--- deriving via (P b i) instance MonadFail (Parser b i)
--- deriving via (P b i) instance MonadParsec Void Text.Text (Parser b i)
--- deriving via (P b i) instance MonadPlus (Parser b i)
--- deriving via (P b i) instance Monad (Parser b i)
--- deriving via (P b i) instance Applicative (Parser b i)
--- deriving via (P b i) instance Alternative (Parser b i)
--- deriving via (P b i) instance Functor (Parser b i)
--- 
--- type X b i = (Show b, Show i)
--- 
--- 
--- pI :: Parser b i i
--- pI = join $ asks pCfgParseI
--- 
--- pB :: Parser b i b
--- pB = join $ asks pCfgParseB
--- 
--- 
--- 
--- -- | Parses an inline seperator
--- 
--- 
--- indent :: Parser b i a -> Parser b i a
--- indent = local \a -> a
---   { pCfgIndent = pCfgIndent a + 2
---   }
--- 
--- oneline :: Parser b i a -> Parser b i a
--- oneline = local \a -> a
---   { pCfgSingleLineSentences = True
---   }
--- 
--- 
--- 
--- --- Parsers
--- pInline :: X b i => Parser b i (Inline i)
--- pInline = label "inline" $ choice
---   [ char ',' $> Comma
---   , char ':' $> Colon
---   , char ';' $> SemiColon
---   , char '@' *> (Reference <$> pWord)
---   , do
---       void $ char '`'
---       v <- Verbatim <$> takeWhileP (Just "verbatim") (\i -> i /= '`' && i /= '\n')
---       void $ char '`'
---       return v
---   , try $ do
---       digits <- takeWhile1P (Just "digits") isNumber
---       parts <- many $ try do
---         x <- satisfy (\t -> t == ',' || t == '.')
---         Text.cons x <$> takeWhile1P (Just "digits") isNumber
---       str <- optional $ try do
---         x <- satisfy (\t -> t == ',' || t == '.')
---         Text.cons x <$> (string "-" <* notFollowedBy pWord)
---       points <- many (string "\\." $> ".")
---       return . Number $ Text.concat (digits : parts) <> fromMaybe mempty str <> Text.concat points
---   , Word <$> pWord
---   , Qouted <$> pQoutedSentences
---   ]
---  where
---   pWord = label "a word" do
---     c <- letterChar <|> char '$' <|> char '#'
---     txt <- many $ choice
---       [ takeWhile1P Nothing \a ->
---         isAlphaNum a
---         || a == '-'
---         || a == '$'
---         || a == '#'
---         || a == '\''
---       , string "\\." $> "."
---       ]
---     return $ Text.cons c (Text.concat txt)
--- 
--- -- | This parser will parse inlines until an empty line is found or
--- -- the next element is not an inline
--- 
--- 
--- 
---  -- where
---  --  endQoute = void do
---  --    many (oneOf [')', '"', '*', '/']) <* (space1 <|> eof)
--- 
--- 
--- -- Sentence
--- 
--- 
 
 -- Sections
 
