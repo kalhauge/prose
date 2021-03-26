@@ -48,7 +48,6 @@ data SerialConfig = SerialConfig
 data SerializeHandler e = SerializeHandler
   { sCfgInlineSep :: Inl e -> Inl e -> Serialized
   , sCfgBlockSep :: Blk e -> Blk e -> Serialized
-  -- , sCfgCompressItem :: Item b i -> Maybe (ItemTree i)
   }
 
 newtype Serialized = Serialized 
@@ -105,8 +104,12 @@ simpleHandler = SerializeHandler {..}
     Mark _ -> 
       mempty
     Qouted p
-      | fromQoutedSentences (getSum <$> cataA countSentences) p > 1 -> 
-          sSentenceSep
+      | fromQoutedSentences (cataA countClosedSentences) p > 0 
+        && fromQoutedSentences (cataA countSentences) p > 1
+        -> 
+          sSentenceSep 
+      | True ->
+          " " -- sText (Text.pack (show p))
     _ -> " "
 
   sCfgBlockSep (Block' e) (Block' e') = case (e, e') of
@@ -160,7 +163,8 @@ sEscapedEnd txt = Serialized \_ ->
     stimesMonoid (Text.length txt - Text.length normal) "\\."
 
 serializeX :: forall e.
-    SerializeHandler e 
+    ProjectableR e
+ => SerializeHandler e 
  -> Extractor e Serialized
  -> DocAlgebra e Serialized
 serializeX SerializeHandler {..} ex = DocAlgebra {..}
@@ -215,12 +219,12 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
         its
   
     Items itms -> 
-      -- case compressItems itms of
-      -- Just trees ->
-      --   foldMap sItemTree trees
-      -- Nothing ->
-      let (i NE.:| its) = itms
-      in fromItem i <> foldMap (\i' -> sEndLine <> fromItem i') its
+      case traverse compressItem itms of
+        Just trees ->
+          foldMap sItemTree trees
+        Nothing ->
+          let (i NE.:| its) = itms
+          in fromItem i <> foldMap (\i' -> sEndLine <> fromItem i') its
   
     OrderedItems _n (i NE.:| its) ->
       fromNumberedItem 1 i
@@ -228,13 +232,14 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
         (\(n, i') -> sEndLine <> fromNumberedItem n i')
         (zip [2..] its)
   
-  -- sItemTree = sIndent <> over \(ItemTree (Item it _ tt blks)) -> indent $
-  --    (sItemType $< it)
-  --    <> (sSentences $< tt)
-  --    <> sEndLine
-  --    <> case NE.nonEmpty blks of
-  --         Nothing -> mempty
-  --         Just trees -> foldMap (sItemTree $<) trees
+  sItemTree (ItemTree it _ tt blks) = sIndent <> indent 
+    ( fromItemType it
+     <> fromSentences tt
+     <> sEndLine
+     <> case NE.nonEmpty blks of
+          Nothing -> mempty
+          Just trees -> foldMap sItemTree trees
+    )
   
   fromItem (Item it _ tt blks) = sIndent <> indent 
     ( fromItemType it
@@ -251,7 +256,6 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
     Plus  -> "+ "
     Times -> "* "
 
-
   fromOrderedItem = 
     fromNumberedItem 0
 
@@ -267,7 +271,7 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
             sEndLine <> fromBlocks blks'
       )
     )
-  
+
   fromQoutedSentences (QoutedSentences qoute sens) =
     let qouteit f t = f <> fromSentences sens <> t
     in case qoute of

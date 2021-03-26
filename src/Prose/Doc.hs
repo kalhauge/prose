@@ -15,7 +15,6 @@ module Prose.Doc where
 
 -- base
 import Data.List.NonEmpty qualified as NE
-import Data.Void
 import GHC.Generics (Generic)
 import Prelude hiding (Word)
 
@@ -205,18 +204,7 @@ deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
 deriving instance ShowR e => Show (SentenceBuilder e)
 
--- | An Item tree.
-newtype ItemTree e = ItemTree
-  { itemTree :: Item (ItemTree e)
-  }
 
-instance DocR (ItemTree e) where
-  type Sec (ItemTree e) = Void
-  type Blk (ItemTree e) = ItemTree e
-  type Inl (ItemTree e) = Inl e
-  type OpenSen (ItemTree e) = OpenSen e
-  type ClosedSen (ItemTree e) = ClosedSen e
-  -- type Sen b (ItemTree e) = Sen b e
 
 
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -15,6 +16,7 @@ import qualified Data.List.NonEmpty as NE
 
 import Prose.Doc
 import Prose.Simple
+import Data.Maybe
 
 
 -- | Create a comment
@@ -59,6 +61,23 @@ sb :: [Inl Simple] -> SentenceBuilder Simple
 sb i = case NE.nonEmpty i of
   Just i' -> Current (OpenSentence i') []
   Nothing -> error "list should be non-empty"
+
+open' :: [Inl Simple] -> Sentence 'Open Simple
+open' = OpenSentence 
+  . fromMaybe (error "list should be nonEmpty") 
+  . NE.nonEmpty
+
+closed' :: [Inl Simple] -> [End] -> Sentence 'Closed Simple
+closed' inl ends = ClosedSentence 
+  ( fromMaybe (error "words should be nonEmpty") 
+  $ NE.nonEmpty inl
+  )
+  ( fromMaybe (error "ends should be nonEmpty") 
+  $ NE.nonEmpty ends
+  )
+
+mark' :: Mark -> Inl Simple
+mark' = Inline' . Mark
 
 -- (<.) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
 -- (<.) = endWith Period

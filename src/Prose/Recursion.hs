@@ -1,4 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
@@ -19,6 +21,7 @@ import Data.Monoid
 import Data.Functor.Identity
 import Control.Category
 import Prelude hiding (Word, (.), id)
+import Data.List.NonEmpty qualified as NE
 
 -- mtl
 import Control.Monad.Reader
@@ -388,7 +391,15 @@ foldDoc = DocAlgebra {..}
     ClosedSentence wrds _ -> fold wrds
 
 countSentences :: DocAlgebra (Value (Sum Int)) (Sum Int)
-countSentences = foldDoc { fromSentence = const 1 }
+countSentences = foldDoc 
+  { fromSentence = \b -> 1 <> fromSentence foldDoc b }
+
+countClosedSentences :: DocAlgebra (Value (Sum Int)) (Sum Int)
+countClosedSentences = foldDoc 
+  { fromSentence = \case
+      OpenSentence e -> fold e
+      ClosedSentence x _ -> 1 <> fold x
+  }
 
 countWords :: DocAlgebra (Value (Sum Int)) (Sum Int)
 countWords = fd { fromInline = \case
@@ -468,6 +479,41 @@ fromCoAlgebra emb DocCoAlgebra {..} =
    , onOpenSen = toOpenSentence
    , onClosedSen = toClosedSentence
    }
+
+-- | An Item tree.
+data ItemTree e = ItemTree
+  { itemTreeType :: ItemType
+  , itemTreeTodo :: Maybe Bool
+  , itemTreeTitle :: Sentences e
+  , itemTreeContents :: [ItemTree e]
+  }
+
+-- instance ProjectableR (ItemTree e) where
+--   projectR = DocMap $ Instance 
+--     { onSec = absurd
+--     , onBlk = 
+--     }
+
+compressItems :: forall e. ProjectableR e 
+  => Blk e 
+  -> Maybe (NE.NonEmpty (ItemTree e))
+compressItems blk = case overBlk (projectR @e) blk of
+  Items items -> traverse compressItem items 
+  _ -> Nothing
+
+compressItem :: forall e. ProjectableR e => Item e -> Maybe (ItemTree e)
+compressItem Item {..} = do 
+  itemTreeContents <- case itemContents of
+    [blk] -> NE.toList <$> compressItems blk
+    [] -> return []
+    _ -> Nothing
+
+  pure $ ItemTree 
+    { itemTreeTitle = itemTitle
+    , itemTreeTodo = itemTodo
+    , itemTreeType = itemType
+    , ..
+    }
 
 
 -- fromAlgebra :: DocAlgebra e a -> Unfix e ~:> Value a

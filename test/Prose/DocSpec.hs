@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -26,10 +27,32 @@ import qualified Hedgehog.Range as Range
 import SpecHelper
 import Prose.Doc
 import Prose.Simple
+import Prose.Builder
 import Prose.Recursion
 
 spec :: Spec
-spec = return ()
+spec = do
+  describe "countSentences" do 
+    let counter = fromSentences (cataA @Simple countSentences) 
+    it "should find one sentence in an open sentence" do
+      counter (OpenSentences 
+        (open' [mark' Comma]))
+        `shouldBe` 1
+    it "should find one sentence in two sentences" do
+      counter 
+        (ClosedSentences 
+          (closed' [mark' Comma] [Period])
+          (Just (OpenSentences (open' [mark' Comma])))
+        )
+        `shouldBe` 2
+    it "should find one sentence in two qouted sentences" do
+      fromQoutedSentences (cataA @Simple countSentences)
+        (QoutedSentences Emph
+          (ClosedSentences 
+            (closed' [mark' Comma] [Period])
+            (Just (OpenSentences (open' [mark' Comma])))
+          )
+        ) `shouldBe` 2
 
 genSimple :: MonadGen m => DocCoAlgebra m Simple
 genSimple = natCoAlgebra (`runReaderT` [minBound..maxBound]) alg

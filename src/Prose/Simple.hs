@@ -156,20 +156,27 @@ showDoc = DocAlgebra {..}
 
   fromSentences sens n = case sens of
     OpenSentences sen' -> 
-      sen' n
+      showParen (n > app_prec) 
+      $ showString "OpenSentences " 
+      . sen' n
     ClosedSentences sen' rest -> 
-      sen' n . maybe (const id) fromSentences rest n
+      showParen (n > app_prec) 
+      $ showString "ClosedSentences " 
+      . sen' n 
+      . showChar ' '
+      . maybe (const id) fromSentences rest n
 
   fromSentence :: forall b. Sentence b (Value (Int -> ShowS)) -> Int -> ShowS
   fromSentence sen n = case sen of 
     OpenSentence inlines' -> 
       showParen (n > app_prec) 
-      $ showString "open " 
+      $ showString "open' " 
       . showListWith ($0) (NE.toList inlines')
     ClosedSentence inlines' end -> 
       showParen (n > app_prec) 
-      $ showString "closed " 
+      $ showString "closed' " 
       . showListWith (\(x :: Int -> ShowS) -> x 0) (NE.toList inlines')
+      . showChar ' '
       . showsPrec (app_prec + 1) (NE.toList end)
 
   app_prec = 10

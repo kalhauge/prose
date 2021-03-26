@@ -25,7 +25,7 @@ Abv\. and list numbers 1\. are okay, but you need to make sure they are escaped.
 ## Sub-sentences
 
 It is possible to write longer "sentences" with stuff in them; like parentheses (like this!).
-We can also add other things like /italic/ and *bold*.
+We can also add other things like /italic/, *bold*, and /*italic bold*/.
 
 When there are multiple sentences in a qoute, they will be placed on a new line:
 "hello, this is a dual sentence qoute!
