@@ -204,7 +204,3 @@ deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
 deriving instance ShowR e => Show (SentenceBuilder e)
 
-
-
-
-

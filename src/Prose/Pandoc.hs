@@ -34,14 +34,14 @@ toPandoc :: Unfix PandocRes ~:> PandocRes
 toPandoc = DocMap $ Instance {..}
  where
   onSec Section {..} n = fold
-   [ PD.header n (onSentences sectionTitle)
+   [ PD.header n (pandocSentences sectionTitle)
    , fold sectionContent
    , foldMap ($ n+1) sectionSubs
    ]
 
   onBlk = \case
     Para p ->
-      PD.para $ onSentences p
+      PD.para $ pandocSentences p
     Items i ->
       PD.bulletList . map onItem $ NE.toList i
     OrderedItems _ its ->
@@ -79,7 +79,7 @@ toPandoc = DocMap $ Instance {..}
     Word i -> (True, PD.str i)
     Qouted q -> (True, onQoute q)
 
-  onQoute (QoutedSentences x b) = onSentences b & case x of
+  onQoute (QoutedSentences x b) = pandocSentences b & case x of
     DoubleQoute -> PD.doubleQuoted
     Emph -> PD.emph
     Strong -> PD.strong
@@ -87,16 +87,19 @@ toPandoc = DocMap $ Instance {..}
     Brackets -> \a -> "[" <> a <> "]"
 
   onItem (Item _ _ t bs) =
-    PD.plain (onSentences t)
+    PD.plain (pandocSentences t)
     <> fold bs
 
   onOrderedItem (OrderedItem _ t bs) =
-    PD.plain (onSentences t)
+    PD.plain (pandocSentences t)
     <> fold bs
 
-  onSentences = \case
-    OpenSentences s -> s
-    ClosedSentences s rst -> s <> PD.space <> foldMap onSentences rst
+pandocSentences :: Sentences PandocRes -> PD.Inlines
+pandocSentences = \case
+  OpenSentences s -> 
+    s
+  ClosedSentences s rst -> 
+    s <> PD.space <> foldMap pandocSentences rst
 
 -- | Convert a Simple Doc to a PandocRes
 simpleToPandoc :: Simple ~:> PandocRes
