@@ -23,6 +23,14 @@ import Data.Text qualified as Text
 
 data SenType = Open | Closed
 
+type family Sen (b' :: SenType) e
+type instance Sen 'Open e = OpenSen e
+type instance Sen 'Closed e = ClosedSen e
+
+data SenTypeOf b where
+  OpenS :: SenTypeOf 'Open
+  ClosedS :: SenTypeOf 'Closed
+
 -- | To make documents extenable we define the things that exist recursively.
 class DocR e where
   type Sec e :: *
@@ -203,4 +211,3 @@ data SentenceBuilder e =
 deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
 deriving instance ShowR e => Show (SentenceBuilder e)
-

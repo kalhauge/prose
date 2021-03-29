@@ -533,84 +533,162 @@ compressItem Item {..} = do
     , ..
     }
 
+-- Zippers
+data PairR e1 e2
 
--- fromAlgebra :: DocAlgebra e a -> Unfix e ~:> Value a
--- fromAlgebra pj = DocMap
---   { overSec = fromSection pj
---   , overBlk = fromBlock pj
---   , overInl = fromInline pj
---   , overSen = SenValue . fromSentence pj
---   }
--- 
--- toExtractor :: e ~:> Value a -> Extractor e a
--- toExtractor DocMap {..} = Extractor
---   { fromSec = overSec
---   , fromBlk = overBlk
---   , fromInl = overInl
---   , fromSen = unSenValue . overSen
---   }
--- 
--- data GeneratorM e m = GeneratorM
---   { toSec :: m (Sec e)
---   , toBlk :: m (Blk e)
---   , toInl :: m (Inl e)
---   , toSen :: m (AnySen e)
---   } 
--- 
--- toGeneratorM :: Monad m => Value a ~:> Monadic e m -> GeneratorM e (ReaderT a m)
--- toGeneratorM DocMap {..} = GeneratorM
---   { toSec = ReaderT overSec
---   , toBlk = ReaderT overBlk
---   , toInl = ReaderT overInl
---   , toSen = ReaderT (\a -> AnySen <$> unMonadicSen (overSen (SenValue a)))
---   }
--- 
+instance DocR (PairR e1 e2) where
+  type Sec (PairR e1 e2) = (Sec e1, Sec e2)
+  type Blk (PairR e1 e2) = (Blk e1, Blk e2)
+  type Inl (PairR e1 e2) = (Inl e1, Inl e2)
+  type OpenSen (PairR e1 e2) = (OpenSen e1, OpenSen e2)
+  type ClosedSen (PairR e1 e2) = (ClosedSen e1, ClosedSen e2)
 
--- -- instance DocR (a, b) where 
--- --   type Sec (a, b) = Void
--- --   type Inl (a, b) = b
--- --   type Blk (a, b) = a
--- --   type Sen (a, b) = Sentence (a, b)
--- 
--- 
--- -- TODO
--- -- sequenceR :: forall m a. Monad m => Unfix (Monadic a m) ~:> Monadic (Unfix a) m
--- -- sequenceR = DocMap {..}
--- --  where 
--- --   overSec Section {..} = do
--- --     sectionTitle' <- overSentences sectionTitle
--- --     sectionContent' <- sequence sectionContent
--- --     sectionSubs' <- sequence sectionSubs
--- --     return Section
--- --       { sectionTitle = sectionTitle'
--- --       , sectionContent = sectionContent'
--- --       , sectionSubs = sectionSubs'
--- --       }
--- -- 
--- --   overBlk = \case 
--- --     Para a -> Para <$> overSentences a
--- --     Comment m -> pure $ Comment m
--- -- 
--- --   overInl = \case
--- --     Qouted q -> Qouted <$> overQoutedSentences q
--- --     a -> pure $ unsafeCoerce a
--- -- 
--- --   overSen :: forall b. Sentence (Monadic a m) b -> MonadicSen (Unfix a) m b
--- --   overSen = \case 
--- --     OpenSentence sen -> 
--- --       MonadicSen $ OpenSentence <$> sequence sen
--- --     ClosedSentence sen end -> 
--- --       MonadicSen $ ClosedSentence <$> sequence sen <*> pure end
--- -- 
--- --   overQoutedSentences QoutedSentences {..} = do
--- --     qoutedSentences' <- overSentences qoutedSentences
--- --     return QoutedSentences 
--- --       { qoutedSentences = qoutedSentences'
--- --       , ..
--- --       }
--- -- 
--- --   overSentences = \case 
--- --     OpenSentences sen -> 
--- --       OpenSentences <$> unMonadicSen sen 
--- --     ClosedSentences sen rest -> 
--- --       ClosedSentences <$> unMonadicSen sen <*> traverse overSentences rest
+data Zipper x e 
+  = SecZipper (Sec e) (SecZipper x e)
+  | BlkZipper (Blk e) (BlkZipper x e)
+  | InlZipper (Inl e) (InlZipper x e)
+  | ItemZipper (Item e) (ItemZipper x e)
+  | OpenSenZipper (OpenSen e) (SenZipper 'Open x e)
+  | ClosedSenZipper (ClosedSen e) (SenZipper 'Closed x e)
+
+type ListZipper a = ([a], [a])
+
+data SecZipper x e 
+  = SecInTop
+  | SecInSection 
+      (SecZipper x e) 
+      (Sec x) 
+      (Sentences e) 
+      [Blk e] 
+      (ListZipper (Sec e))
+
+data BlkZipper x e 
+  = BlkInSection 
+      (SecZipper x e) 
+      (Sec x)
+      (Sentences e) 
+      (ListZipper (Blk e)) 
+      [Sec e]
+  | BlkInItem 
+      (ItemZipper x e)
+      ItemType 
+      (Maybe Bool) 
+      (Sentences e)
+      (ListZipper (Blk e)) 
+
+type family SentencesZipper (b :: SenType) e
+type instance SentencesZipper 'Open e   = [ClosedSen e]
+type instance SentencesZipper 'Closed e = ([ClosedSen e], Sentences e)
+
+data SenZipper b x e 
+  = SenInSectionTitle 
+      (SecZipper x e) 
+      (Sec x)
+      (SentencesZipper b e) 
+      [Blk e]
+      [Sec e]
+  | SenInItemTitle 
+      (ItemZipper x e) 
+      ItemType 
+      (Maybe Bool) 
+      (SentencesZipper b e) 
+      [Blk e]
+  | SenInPara 
+      (BlkZipper x e) 
+      (Blk x)
+      (SentencesZipper b e)
+  | SenInQoute 
+      (InlZipper x e) 
+      (Inl x)
+      Qoute
+      (SentencesZipper b e)
+
+data InlZipper x e 
+  = InlInOpenSen 
+      (SenZipper 'Open x e) 
+      (OpenSen x) 
+      (ListZipper (Inl e)) 
+  | InlInClosedSen 
+      (SenZipper 'Closed x e) 
+      (ClosedSen x)
+      (ListZipper (Inl e)) 
+      (NE.NonEmpty End)
+
+data ItemZipper x e 
+  = ItemInItems 
+      (BlkZipper x e) 
+      (Blk x)
+      (ListZipper (Item e))
+
+
+up :: forall e x. 
+    (PairR (Unfix e) x ~:> e) 
+  -> Zipper x e 
+  -> Zipper x e
+up em z = case z of
+  SecZipper sec t -> case t of
+    SecInTop -> 
+      z
+    SecInSection up' x sens blks lists ->
+      SecZipper 
+        (overSec em (Section sens blks (unziplist sec lists), x))
+        up'
+
+  BlkZipper blk t -> case t of
+    BlkInSection up' x sens blks lists ->
+      SecZipper 
+        (overSec em (Section sens (unziplist blk blks) lists, x))
+        up'
+
+    BlkInItem up' it todo sens content ->
+      ItemZipper (Item it todo sens (unziplist blk content))
+        up'
+
+  InlZipper inl t -> case t of
+    InlInOpenSen up' x list -> 
+      OpenSenZipper 
+        (overOpenSen em (OpenSentence (unzipnelist inl list) :: Sentence 'Open e, x))
+        up' 
+    InlInClosedSen up' x list ends -> 
+      ClosedSenZipper 
+        (overClosedSen em (ClosedSentence (unzipnelist inl list) ends :: Sentence 'Closed e, x)) 
+        up' 
+
+  OpenSenZipper sen t -> 
+    upSentence OpenS sen t
+
+  ClosedSenZipper sen t -> 
+    upSentence ClosedS sen t
+
+  ItemZipper itm (ItemInItems up' x lst) -> 
+    BlkZipper (overBlk em (Items (unzipnelist itm lst), x)) up'
+
+  where 
+    upSentence :: SenTypeOf b -> Sen b e -> SenZipper b x e -> Zipper x e
+    upSentence stp sen t = case t of
+      SenInSectionTitle up' x tlt content secs ->
+        SecZipper (overSec em (Section (unzipSentences stp sen tlt) content secs, x)) up'
+
+      SenInItemTitle up' itm todo title secs ->
+        ItemZipper (Item itm todo (unzipSentences stp sen title) secs) up'
+
+      SenInPara up' x sens ->
+        BlkZipper (overBlk em (Para (unzipSentences stp sen sens), x)) up'
+
+      SenInQoute up' x qt sens ->
+        InlZipper (overInl em (Qouted $ QoutedSentences qt (unzipSentences stp sen sens), x)) up'
+
+    unzipSentences :: SenTypeOf b -> Sen b e -> SentencesZipper b e -> Sentences e
+    unzipSentences stp = case stp of
+      OpenS -> foldr (\x -> ClosedSentences x . Just) . OpenSentences 
+      ClosedS -> \sen (lst, xs) -> 
+        foldr (\x -> ClosedSentences x . Just) xs (sen:lst)
+
+
+unziplist :: a -> ListZipper a -> [a]
+unziplist a (ls, ts) = foldr (:) ts (a:ls)
+
+unzipnelist :: a -> ListZipper a -> NE.NonEmpty a
+unzipnelist a (ls, ts) = foldr (NE.<|) (a NE.:| ts) ls
+
+
