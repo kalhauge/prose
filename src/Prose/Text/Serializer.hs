@@ -202,6 +202,7 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
   fromInline = \case
     Word x -> sEscaped x
     Number x -> sEscapedEnd x
+    Emdash -> "--"
     Mark Comma -> ","
     Mark Colon -> ":"
     Mark SemiColon -> ";"

@@ -79,6 +79,7 @@ toPandoc = DocMap $ Instance {..}
         Colon -> PD.str ":"
       )
     Verbatim a -> (True, PD.code a)
+    Emdash -> (True, PD.str "--")
     Number a -> (True, PD.str a)
     Reference a -> (True, PD.str ("@" <> a))
     Word i -> (True, PD.str i)

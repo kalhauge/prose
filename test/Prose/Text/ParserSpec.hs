@@ -76,40 +76,11 @@ specInline = describe "inline" do
 
 specBlock :: Spec
 specBlock = describe "block" do
-  -- canonical "- a.\n  b.\n  - c\n- d"
-  -- "- a\n- b\n- c" `correctsTo` "- a\n- b\n- c"
-  -- "- a\n  - b\n  - d\n- c" `correctsTo` "- a\n\n  - b\n  - d\n\n- c"
-
   describe "single blocks" do
-    myTripping 
+    serializeRoundtrip 
       (toBlock genSimple) 
       (fromBlock serializeSimple)
       (toBlock parseSimple)
-
-  -- describe "multiple blocks" do
-  --   myTripping
-  --     (runReaderT
-  --       (Gen.nonEmpty (Range.linear 1 3) genSimpleBlock)
-  --       genConfig
-  --     )
-  --     sBlocks
-  --     pBlocks
-
- -- where
-  -- canonical txt = it ("should parse " ++ show txt) do
-  --   parseOrFail (pBlock <* eof) txt \a ->
-  --     runSimpleSerializer sBlock a `shouldBe` txt
-
-   -- ex txt = it ("should parse " ++ show txt) do
-   --  case runSimpleParser (pSimpleDoc <* eof) txt of
-   --    Left err -> expectationFailure (errorBundlePretty err)
-   --    Right _ -> return ()
-
-   -- correctsTo txt txt2 = it ("should correct " ++ show txt ++ " to " ++ show txt2) do
-   --  case runSimpleParser (pBlock <* eof) txt of
-   --    Left err -> expectationFailure (errorBundlePretty err)
-   --    Right d ->
-   --      serialize (sBlock d simpleSerializeConfig) `shouldBe` txt2
 
 specSectionText :: Spec
 specSectionText = describe "section text" do

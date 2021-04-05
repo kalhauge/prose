@@ -167,6 +167,7 @@ data Inline e
   = Word !Text.Text
   | Reference !Text.Text
   | Mark !Mark
+  | Emdash 
   | Verbatim !Text.Text
   | Number !Text.Text
   | Qouted (QoutedSentences e)

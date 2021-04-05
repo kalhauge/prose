@@ -145,6 +145,7 @@ showDoc = DocAlgebra {..}
     Verbatim w -> showString "verb' " . shows w
     Number w -> showString "num' " . shows w
     Mark m -> showString "mark' " . shows m
+    Emdash -> showString "emdash'"
     Qouted q -> fromQoutedSentences q n
 
   fromQoutedSentences (QoutedSentences qute sen) n = 

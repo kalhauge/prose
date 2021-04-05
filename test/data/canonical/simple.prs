@@ -18,6 +18,7 @@ Furthermore, we have numbers (100), and decimal numbers (10.0) and separated num
 We can also add currency $100, $ 100, and 100,- kr, which are rendered differently.
 We can also use some special characters æøå.
 Abv\. and list numbers 1\. are okay, but you need to make sure they are escaped.
+Finally -- em dashes are allowed.
 
 -- And comments, are newer changed
 -- like this.

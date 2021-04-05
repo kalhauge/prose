@@ -114,6 +114,7 @@ generateR Instance {..} = DocCoAlgebra {..}
     qoutes <- ask
     Gen.recursive Gen.choice
       [ Mark <$> Gen.enumBounded
+      , pure Emdash
       , do
           c <- Gen.alpha
           word <- Gen.text (Range.linear 0 32) $

@@ -137,6 +137,7 @@ parserR pSec app = DocCoAlgebra {..}
   toInline = label "inline" $ choice
     [ char ',' $> Mark Comma
     , char ':' $> Mark Colon
+    , string "--" $> Emdash
     , char ';' $> Mark SemiColon
     , char '@' *> (Reference <$> pWord)
     , do
