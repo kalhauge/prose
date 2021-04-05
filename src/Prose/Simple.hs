@@ -114,6 +114,12 @@ showDoc = DocAlgebra {..}
       showParen (n > app_prec) 
       $ showString "comment' "
         . shows (Text.intercalate "\n" x)
+    CodeBlock nm x -> 
+      showParen (n > app_prec) 
+      $ showString "codeblock' "
+        . shows nm
+        . showChar ' '
+        . shows x 
     Items its -> 
       showParen (n > app_prec) 
       $ showString "items' "
@@ -140,7 +146,6 @@ showDoc = DocAlgebra {..}
     Number w -> showString "num' " . shows w
     Mark m -> showString "mark' " . shows m
     Qouted q -> fromQoutedSentences q n
-
 
   fromQoutedSentences (QoutedSentences qute sen) n = 
     showParen (n > app_prec) 

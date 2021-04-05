@@ -14,6 +14,9 @@ import Data.Foldable
 import Data.Function
 import Data.List.NonEmpty qualified as NE
 
+-- text
+import Data.Text qualified as Text
+
 import Prose.Doc
 import Prose.Recursion
 import Prose.Simple
@@ -42,6 +45,8 @@ toPandoc = DocMap $ Instance {..}
   onBlk = \case
     Para p ->
       PD.para $ pandocSentences p
+    CodeBlock nm p ->
+      PD.codeBlockWith ("", toList nm, []) (Text.unlines p)
     Items i ->
       PD.bulletList . map onItem $ NE.toList i
     OrderedItems _ its ->

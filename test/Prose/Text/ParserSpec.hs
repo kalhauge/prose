@@ -41,9 +41,8 @@ spec :: SpecWith ()
 spec = do
   specInline
   specBlock
-  -- specSectionText
+  specSectionText
   specSection
-
   specAllDataFiles
 
 specInline :: Spec
@@ -112,18 +111,29 @@ specBlock = describe "block" do
    --    Right d ->
    --      serialize (sBlock d simpleSerializeConfig) `shouldBe` txt2
 
--- specSectionText :: Spec
--- specSectionText = describe "section text" do
---   onFile "test/data/good/simple.prs" \txt -> do
---     it "should contain 2 headers" do
---       parseOrFail pSectionText txt \a -> do
---         a `shouldSatisfy` (== 2) . length
--- 
---   onGoodFiles \txt -> do
---     it "should parse" do
---       parseOrFail pSectionText txt \a -> do
---         a `shouldSatisfy` (>= 0) . length
--- 
+specSectionText :: Spec
+specSectionText = describe "section text" do
+  let parser = runReaderT pSectionText defaultParserConfig
+  it "should not split code blocks" do
+    let codeblockexample = "# h1\n```\nblk\n## h2\n```"
+    parseOrFail parser codeblockexample \a -> do
+      a `shouldSatisfy` (== 1) . length
+
+  onFile "test/data/good/simple.prs" \txt -> do
+    it "should contain 2 headers" do
+      parseOrFail parser txt \a -> do
+        a `shouldSatisfy` (== 2) . length
+
+  onGoodFiles \txt -> do
+    it "should parse" do
+      parseOrFail parser txt \a -> do
+        a `shouldSatisfy` (>= 0) . length
+  
+  onCanonicalFiles \txt -> do
+    it "should parse" do
+      parseOrFail parser txt \a -> do
+        a `shouldSatisfy` (>= 0) . length
+
 
 specSection :: Spec
 specSection = describe "section" do

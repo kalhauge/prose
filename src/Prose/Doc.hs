@@ -81,6 +81,7 @@ data Block e
   = Para (Sentences e)
   | Comment [Text.Text]
   | Items (NE.NonEmpty (Item e))
+  | CodeBlock (Maybe Text.Text) [Text.Text]
   | OrderedItems OrderType (NE.NonEmpty (OrderedItem e))
 
 deriving instance EqR e => Eq (Block e)

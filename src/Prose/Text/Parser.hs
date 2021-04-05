@@ -243,6 +243,7 @@ parserR pSec app = DocCoAlgebra {..}
       [ comment
       , orderedItems
       , items
+      , codeblock
       , para
       ]
 
@@ -258,6 +259,23 @@ parserR pSec app = DocCoAlgebra {..}
                 *> toNumeralItem)
           return $ OrderedItems Numeral (i NE.:| is)
       ]
+
+    codeblock = label "code block" $ do
+      _ <- label "start" $ string "```"
+      x <- takeWhileP (Just "code block name") (/= '\n')
+      let 
+        name = if Text.null x 
+          then Nothing
+          else Just x
+      code <- flip manyTill (try $ eol *> pIndent *> string "```") do
+        label "code line" $ choice 
+          [ try (eol *> pIndent 
+                     *> takeWhileP Nothing (/= '\n')
+                )
+          , try (eol *> lookAhead eol $> "") 
+          ]
+      void eol <|> void eof
+      return $ CodeBlock name code
 
     comment = label "comment" do
       t <- commentLine
@@ -275,7 +293,11 @@ parserR pSec app = DocCoAlgebra {..}
 
     items = label "items" do
       i <- toItem
-      is <- many (try (optional pEmptyLine *> pIndent *> lookAhead pItemType) *> toItem)
+      is <- many $ try (
+        optional pEmptyLine 
+        *> pIndent 
+        *> lookAhead pItemType) 
+        *> toItem
       return $ Items (i NE.:| is)
 
   toOrderedItem = choice 
@@ -348,30 +370,38 @@ pBlocks app = label "blocks" $
 -- make parseing more lazy.
 pSectionText :: P (NE.NonEmpty (Int, State Text.Text Void))
 pSectionText = go id
-
  where
   go :: (NE.NonEmpty (Int, State Text.Text Void) -> a) -> P a
   go k = do
     header <- Text.length <$> takeWhile1P (Just "header") (== '#')
     hspace
     st <- getParserState
-    txt <- Text.intercalate "\n" <$> linesUntilNext id
+    txt <- Text.intercalate "\n" <$> linesUntilNext True id
     let item = (header, st {stateInput = txt})
     choice
       [ go (k . (item NE.<|))
       , return (k $ item NE.:| [])
       ]
 
-  linesUntilNext :: ([Text.Text] -> a) -> P a
-  linesUntilNext k = do
+  linesUntilNext :: Bool -> ([Text.Text] -> a) -> P a
+  linesUntilNext expectHeader k = do
     txt <- takeWhileP Nothing (/= '\n')
     void eol <|> eof
+    let 
+      expectHeaderNext = 
+        if Text.isPrefixOf "```" txt 
+        then not expectHeader 
+        else expectHeader
     choice
-      [ do
-          lookAhead (void (char '#') <|> eof)
+      [ do 
+          if expectHeaderNext
+            then do
+              lookAhead (void (char '#') <|> eof)
+            else do
+              lookAhead eof
           return (k [txt])
       , do
-          linesUntilNext (k . (txt:))
+          linesUntilNext expectHeaderNext (k . (txt:))
       ]
 
 type PState = State Text.Text Void
@@ -412,4 +442,3 @@ pEmptyLine :: P ()
 pEmptyLine = label "empty line" 
   . try . void 
   $ hspace *> eol
-

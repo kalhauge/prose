@@ -86,6 +86,12 @@ generateR Instance {..} = DocCoAlgebra {..}
       <$> Gen.list 
         (Range.linear 1 3) 
         (Gen.text (Range.linear 0 4) Gen.alphaNum)
+    , CodeBlock 
+      <$> Gen.maybe 
+        (Gen.element [ "java", "markdown", "prose", "bibtex" ])
+      <*> Gen.list 
+        (Range.linear 0 4) 
+        (Gen.text (Range.linear 0 4) Gen.alphaNum)
     ]
     [ Items <$> Gen.nonEmpty (Range.linear 1 3) toItem
     , OrderedItems 

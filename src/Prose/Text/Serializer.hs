@@ -27,7 +27,6 @@ import Data.List.NonEmpty qualified as NE
 import Data.Semigroup
 import Data.String
 
-
 -- text
 import Data.Text qualified as Text
 import Data.Text.Lazy qualified as LazyText
@@ -65,11 +64,11 @@ instance Monoid Serialized where
 
 singleline :: Serialized -> Serialized
 singleline (Serialized ser) = Serialized \cfg -> 
-  ser (cfg { sCfgSingleLine = True })
+  ser (cfg { sCfgSingleLine = True})
 
 indent :: Serialized -> Serialized
 indent (Serialized ser) = Serialized \cfg -> 
-  ser (cfg { sCfgIndent = sCfgIndent cfg + 2 })
+  ser (cfg { sCfgIndent = sCfgIndent cfg + 2})
 
 increaseHeader :: Serialized -> Serialized
 increaseHeader (Serialized ser) = Serialized \cfg -> 
@@ -106,7 +105,7 @@ simpleHandler = SerializeHandler {..}
     Qouted p
       | fromQoutedSentences (cataA countClosedSentences) p > 0 
         && fromQoutedSentences (cataA countSentences) p > 1
-        -> 
+        ->
           sSentenceSep 
       | True ->
           " " -- sText (Text.pack (show p))
@@ -146,7 +145,8 @@ sSentenceSep :: Serialized
 sSentenceSep = Serialized \cfg -> 
   if sCfgSingleLine cfg 
   then " "
-  else let Serialized x = sEndLine <> sIndent in x cfg
+  else
+    let Serialized x = sEndLine <> sIndent in x cfg
 
 sHeader :: Serialized 
 sHeader = Serialized \(sCfgHeaderDepth -> n) ->
@@ -208,16 +208,16 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
     Verbatim txt -> "`" <> sText txt <> "`"
     Reference txt -> "@" <> sText txt
     Qouted q -> fromQoutedSentences q
-  
+
   fromBlock = \case
     Para sb ->
       sIndent <> fromSentences sb <> sEndLine
-  
+
     Comment its ->
       foldMap
         (\i -> sIndent <> "--" <> sText i <> sEndLine)
         its
-  
+
     Items itms -> 
       case traverse compressItem itms of
         Just trees ->
@@ -225,13 +225,18 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
         Nothing ->
           let (i NE.:| its) = itms
           in fromItem i <> foldMap (\i' -> sEndLine <> fromItem i') its
-  
+
     OrderedItems _n (i NE.:| its) ->
       fromNumberedItem 1 i
       <> foldMap
         (\(n, i') -> sEndLine <> fromNumberedItem n i')
         (zip [2..] its)
-  
+
+    CodeBlock n txt ->
+      sIndent <> "```" <> foldMap sText n <> sEndLine
+      <> foldMap (\a -> sIndent <> sText a <> sEndLine) txt
+      <> sIndent <> "```" <> sEndLine
+
   sItemTree (ItemTree it _ tt blks) = sIndent <> indent 
     ( fromItemType it
      <> fromSentences tt
@@ -240,7 +245,7 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
           Nothing -> mempty
           Just trees -> foldMap sItemTree trees
     )
-  
+
   fromItem (Item it _ tt blks) = sIndent <> indent 
     ( fromItemType it
      <> fromSentences tt
@@ -250,7 +255,7 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
           Just blks' ->
             sEndLine <> fromBlocks blks'
     )
-  
+
   fromItemType = \case
     Minus -> "- "
     Plus  -> "+ "

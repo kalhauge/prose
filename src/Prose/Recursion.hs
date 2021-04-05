@@ -257,6 +257,7 @@ instance DocFunctor Block where
     Para a -> Para (mapDoc e a)
     Items itm -> Items (mapDoc e <$> itm)
     Comment a -> Comment a
+    CodeBlock n a -> CodeBlock n a
     OrderedItems n itm -> OrderedItems n (mapDoc e <$> itm)
 
 instance DocFunctor Inline where
@@ -361,6 +362,7 @@ foldDoc = DocAlgebra {..}
   fromBlock = \case
     Para s -> fromSentences s
     Comment _ -> mempty
+    CodeBlock _ _ -> mempty
     Items its -> 
       foldMap fromItem its
     OrderedItems _ its -> 

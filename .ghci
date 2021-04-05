@@ -1,4 +1,6 @@
 :set -fwarn-unused-binds -fwarn-unused-imports
 :set -isrc -itest
+:set -XOverloadedStrings
+:set prompt  "\x03BB: "
 :load Main Prose
 

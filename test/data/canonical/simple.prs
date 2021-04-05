@@ -117,3 +117,33 @@ Like this:
 3) Three
 
 Numbered lists do not compress right now.
+
+## Code Blocks
+
+We can also use code blocks:
+
+```
+example
+```
+
+And with languages:
+
+```java
+public class A {
+}
+```
+
+A code block can also be nested:
+
+- like this:
+
+  ```
+  A simple block
+  ```
+
+And contain headers:
+
+```
+like this
+# This is not a header
+```
