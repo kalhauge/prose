@@ -77,7 +77,7 @@ specInline = describe "inline" do
 specBlock :: Spec
 specBlock = describe "block" do
   describe "single blocks" do
-    serializeRoundtrip 
+    myTripping 
       (toBlock genSimple) 
       (fromBlock serializeSimple)
       (toBlock parseSimple)

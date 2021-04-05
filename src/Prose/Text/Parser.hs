@@ -227,7 +227,7 @@ parserR pSec app = DocCoAlgebra {..}
     else return x
 
   pWord = label "a word" do
-    c <- letterChar <|> char '$' <|> char '#'
+    c <- letterChar <|> char '$' <|> char '#' <|> char '&'
     txt <- many $ choice
       [ takeWhile1P Nothing \a ->
         isAlphaNum a
