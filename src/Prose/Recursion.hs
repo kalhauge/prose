@@ -12,10 +12,10 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Prose.Recursion where
 
 -- base
-import Unsafe.Coerce
 import Data.Foldable
 import Data.Monoid
 import Data.Functor.Identity
@@ -259,12 +259,16 @@ instance DocFunctor Block where
     Comment a -> Comment a
     CodeBlock n a -> CodeBlock n a
     OrderedItems n itm -> OrderedItems n (mapDoc e <$> itm)
-
 instance DocFunctor Inline where
   mapDoc e = \case
+    Word t -> Word t
+    Reference t -> Reference t
+    Mark m -> Mark m
+    Emdash -> Emdash
+    Verbatim t -> Verbatim t
+    Number t -> Number t
     Qouted (QoutedSentences a b) 
-      -> Qouted (QoutedSentences a (mapDoc e b))
-    a -> unsafeCoerce a 
+       -> Qouted (QoutedSentences a (mapDoc e b))
 
 instance DocFunctor QoutedSentences where
   mapDoc e QoutedSentences {..} = QoutedSentences 
@@ -692,5 +696,4 @@ unziplist a (ls, ts) = foldr (:) ts (a:ls)
 
 unzipnelist :: a -> ListZipper a -> NE.NonEmpty a
 unzipnelist a (ls, ts) = foldr (NE.<|) (a NE.:| ts) ls
-
 

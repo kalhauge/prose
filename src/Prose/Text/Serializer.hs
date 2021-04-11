@@ -32,6 +32,7 @@ import Data.Text qualified as Text
 import Data.Text.Lazy qualified as LazyText
 import Data.Text.Lazy.Builder qualified as Builder
 
+-- prose
 import Prose.Doc
 import Prose.Simple
 import Prose.Recursion
@@ -129,7 +130,8 @@ serialized handler = mapV f . serialize handler
 serialize :: ProjectableR e 
   => SerializeHandler e 
   -> Extractor e Serialized
-serialize handler = foldR projectR (serializeX handler)
+serialize handler = 
+  foldR projectR (serializeX handler)
 
 sEndLine :: Serialized
 sEndLine = "\n"
@@ -302,3 +304,4 @@ serializeX SerializeHandler {..} ex = DocAlgebra {..}
     Exclamation -> "!"
     Question -> "?"
     Period -> "."
+

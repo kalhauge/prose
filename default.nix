@@ -23,6 +23,6 @@ in
     modifier = drv:
       with pkgs.haskell.lib;
       addBuildTools drv (with haskellPackages;
-        [ cabal-install ghcid haskell-language-server])
+        [ cabal-install ghcid haskell-language-server retrie ])
     ;
   }
