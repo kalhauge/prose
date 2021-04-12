@@ -1,29 +1,30 @@
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
+
 module Prose.Annotated where
 
 import Prose.Doc
-import Prose.Simple
 import Prose.Recursion
+import Prose.Simple
 
 data Ann a
 
-data AnnSection a = 
-  AnnSection !a (Section (Ann a))
+data AnnSection a
+  = AnnSection !a (Section (Ann a))
   deriving (Ord, Show, Eq)
 
-data AnnBlock a = 
-  AnnBlock !a (Block (Ann a))
+data AnnBlock a
+  = AnnBlock !a (Block (Ann a))
   deriving (Ord, Show, Eq)
 
-data AnnInline a = 
-  AnnInline !a (Inline (Ann a))
+data AnnInline a
+  = AnnInline !a (Inline (Ann a))
   deriving (Ord, Show, Eq)
 
-data AnnSentence (b :: SenType) a = 
-  AnnSentence !a (Sentence b (Ann a))
+data AnnSentence (b :: SenType) a
+  = AnnSentence !a (Sentence b (Ann a))
   deriving (Ord, Show, Eq)
 
 instance DocR (Ann a) where
@@ -38,26 +39,29 @@ instance Show a => ShowR (Ann a)
 instance Eq a => EqR (Ann a)
 
 instance ProjectableR (Ann a) where
-  projectR = DocMap $ Instance 
-    { onSec = \(AnnSection _ a) -> a
-    , onBlk = \(AnnBlock _ a) -> a
-    , onInl = \(AnnInline _ a) -> a
-    , onOpenSen = \(AnnSentence _ a) -> a
-    , onClosedSen = \(AnnSentence _ a) -> a
-    }
+  projectR =
+    DocMap $
+      Instance
+        { onSec = \(AnnSection _ a) -> a
+        , onBlk = \(AnnBlock _ a) -> a
+        , onInl = \(AnnInline _ a) -> a
+        , onOpenSen = \(AnnSentence _ a) -> a
+        , onClosedSen = \(AnnSentence _ a) -> a
+        }
 
 withConst :: a -> Unfix (Ann a) ~:> Ann a
-withConst a = DocMap $ Instance 
-  { onSec = AnnSection a
-  , onBlk = AnnBlock a
-  , onInl = AnnInline a
-  , onOpenSen = AnnSentence a
-  , onClosedSen = AnnSentence a
-  }
+withConst a =
+  DocMap $
+    Instance
+      { onSec = AnnSection a
+      , onBlk = AnnBlock a
+      , onInl = AnnInline a
+      , onOpenSen = AnnSentence a
+      , onClosedSen = AnnSentence a
+      }
 
 toSimple :: Ann a ~:> Simple
-toSimple = hylo projectR embedR 
+toSimple = hylo projectR embedR
 
 fromSimple :: a -> Simple ~:> Ann a
 fromSimple a = hylo projectR (withConst a)
-

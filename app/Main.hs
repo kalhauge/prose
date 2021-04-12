@@ -4,4 +4,3 @@ import Prose
 
 main :: IO ()
 main = Prose.app
-

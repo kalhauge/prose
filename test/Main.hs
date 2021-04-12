@@ -1,13 +1,15 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
+
 module Main where
 
--- base 
+-- base
+
+import qualified Control.Exception as E
 import Data.Functor
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import System.Exit
 import System.IO
-import qualified Control.Exception as E
 
 -- tasty
 import Test.Tasty
@@ -27,22 +29,26 @@ import Test.DocTest (doctest)
 -- hlint
 import Language.Haskell.HLint
 
-import qualified Spec 
+import qualified Spec
 
 main :: IO ()
 main = do
-  m <- concat <$> sequence
-    [ specifications
-    , doctests
-    , hlints
-    ]
+  m <-
+    concat
+      <$> sequence
+        [ specifications
+        , doctests
+        , hlints
+        ]
 
   defaultMainWithRerun (testGroup "All" m)
-
  where
   specifications :: IO [TestTree]
-  specifications = (:[]) <$> testSpec "Specifications" 
-    Spec.spec
+  specifications =
+    (: [])
+      <$> testSpec
+        "Specifications"
+        Spec.spec
 
   doctests :: IO [TestTree]
   doctests = testSpecs $ it "Doctest" do
@@ -50,15 +56,15 @@ main = do
 
   hlints :: IO [TestTree]
   hlints = testSpecs $ it "HLint" do
-    hlint ["src", "test", "--quiet"] >>= \case 
+    hlint ["src", "test", "--quiet"] >>= \case
       [] -> return ()
-      a:_ -> expectationFailure (showIdeaANSI a)
+      a : _ -> expectationFailure (showIdeaANSI a)
 
 -- | capture the doctests
 captureDoctest :: [String] -> IO ()
 captureDoctest files = withFile ".doctest" ReadWriteMode \h ->
   E.catch
-    ( redirectingHandle stderr h (doctest files) )
+    (redirectingHandle stderr h (doctest files))
     ( \case
         ExitFailure _ -> do
           hFlush h
@@ -68,11 +74,12 @@ captureDoctest files = withFile ".doctest" ReadWriteMode \h ->
           return ()
     )
 
--- | redirectingHandle; borrowed from 
--- https://hackage.haskell.org/package/main-tester-0.2.0.1/docs/Test-Main.html
+{- | redirectingHandle; borrowed from
+ https://hackage.haskell.org/package/main-tester-0.2.0.1/docs/Test-Main.html
+-}
 redirectingHandle :: Handle -> Handle -> IO r -> IO r
-redirectingHandle from to action = E.bracket 
-  ( hDuplicate from >>= (hDuplicateTo to from $>) )
-  ( \save -> hDuplicateTo save from >> hClose save )
-  ( const action )
-
+redirectingHandle from to action =
+  E.bracket
+    (hDuplicate from >>= (hDuplicateTo to from $>))
+    (\save -> hDuplicateTo save from >> hClose save)
+    (const action)

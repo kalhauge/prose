@@ -1,8 +1,9 @@
+{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE ImportQualifiedPost #-}
+
 module Prose.Extension.Article where
 
 -- parser-combinators
@@ -25,11 +26,13 @@ import Data.Text qualified as Text
 
 import Prose.Builder
 import Prose.Doc
-import Prose.Simple
-import Prose.Recursion
 import Prose.Pandoc
+import Prose.Recursion
+import Prose.Simple
+
 -- import Prose.Text.Serializer
 import Prose.Internal.Validation
+
 -- import Prose.Internal.DocParser
 
 data Author = Author
@@ -40,9 +43,9 @@ data Author = Author
 
 data Article = Article
   { articleTitle :: Sentences Simple
-  , articleAuthors :: [ Author ]
-  , articleAbstract :: [ Sentences Simple ]
-  , articleSections :: [ Section' ]
+  , articleAuthors :: [Author]
+  , articleAbstract :: [Sentences Simple]
+  , articleSections :: [Section']
   }
   deriving (Eq, Show)
 
@@ -56,15 +59,15 @@ type BlockParser =
 -- fromDoc (Section' Section {..}) = do
 --   let articleTitle = mapDoc toSimple sectionTitle
 --   let articleSections = sectionSubs
--- 
+--
 --   let
 --     x = runParser do
 --       articleAuthors <- maybe [] getAuthors <$> optional dCompressedItems
 --       articleAbstract <- many dPara
 --       pure $ Article {..}
--- 
+--
 --   x "hello" sectionContent
--- 
+--
 --  where
 --   getAuthors :: Foldable f => f (ItemTree Simple) -> [ Author ]
 --   getAuthors = foldMap \(ItemTree _ _ t x) ->
@@ -74,38 +77,42 @@ type BlockParser =
 --     | t == sen (sb [word' "by", colon' ])
 --     ]
 
-
 toDoc :: Article -> Section'
-toDoc Article {..} = Section' $ Section
-  { sectionTitle = articleTitle
-  , sectionContent = concat
-    [ case NE.nonEmpty articleAuthors of
-        Just _ -> [ items'
-            [ item' (sb [ word' "by", colon' ])
-              [ items'
-                [ item' (sb [ word' n]) []
-                | Author n _ <- articleAuthors
-                ]
-              ]
+toDoc Article{..} =
+  Section' $
+    Section
+      { sectionTitle = articleTitle
+      , sectionContent =
+          concat
+            [ case NE.nonEmpty articleAuthors of
+                Just _ ->
+                  [ items'
+                      [ item'
+                          (sb [word' "by", colon'])
+                          [ items'
+                              [ item' (sb [word' n]) []
+                              | Author n _ <- articleAuthors
+                              ]
+                          ]
+                      ]
+                  ]
+                Nothing -> []
+            , Block' . para <$> articleAbstract
+            , []
             ]
-          ]
-        Nothing -> []
-    , Block' . para <$> articleAbstract
-    , []
-    ]
-  , sectionSubs = articleSections
-  }
+      , sectionSubs = articleSections
+      }
 
 toPandoc :: Article -> P.Pandoc
-toPandoc Article {..} =
+toPandoc Article{..} =
   P.setTitle (pandocSentences $ mapDoc simpleToPandoc articleTitle)
-  . P.setAuthors
-    (authorToPandoc <$> articleAuthors)
-  . P.setMeta "abstract"
-    (foldMap (overBlk simpleToPandoc . Block' . Para) articleAbstract)
-  . P.doc
-  $ foldMap (\s -> overSec simpleToPandoc s 1) articleSections
-
+    . P.setAuthors
+      (authorToPandoc <$> articleAuthors)
+    . P.setMeta
+      "abstract"
+      (foldMap (overBlk simpleToPandoc . Block' . Para) articleAbstract)
+    . P.doc
+    $ foldMap (\s -> overSec simpleToPandoc s 1) articleSections
  where
-  authorToPandoc Author {..} =
+  authorToPandoc Author{..} =
     P.text authorName

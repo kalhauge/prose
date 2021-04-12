@@ -1,9 +1,10 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-|
+{-# LANGUAGE RankNTypes #-}
+
+{- |
 This module allows building Prose documents by hand
 -}
 module Prose.Builder where
@@ -14,10 +15,9 @@ import qualified Data.Text as Text
 -- base
 import qualified Data.List.NonEmpty as NE
 
+import Data.Maybe
 import Prose.Doc
 import Prose.Simple
-import Data.Maybe
-
 
 -- | Create a comment
 comment :: Text.Text -> Block e
@@ -41,20 +41,21 @@ items' = maybe (error "list is empty") safeItems' . NE.nonEmpty
 
 -- | Itemized List
 safeItems' :: NE.NonEmpty Item' -> Block'
-safeItems' =  Block' . Items
+safeItems' = Block' . Items
 
 -- | A List Item
 item' ::
-  SentenceBuilder e
-  -> [Blk e]
-  -> Item e
+  SentenceBuilder e ->
+  [Blk e] ->
+  Item e
 item' = Item Minus Nothing . fromSentenceBuilder
 
 -- | A List Todo
 todo ::
-  Bool -- ^ Is it done?
-  -> Sentences e
-  -> Item e
+  -- | Is it done?
+  Bool ->
+  Sentences e ->
+  Item e
 todo b s = Item Minus (Just b) s []
 
 sb :: [Inl Simple] -> SentenceBuilder Simple
@@ -63,46 +64,48 @@ sb i = case NE.nonEmpty i of
   Nothing -> error "list should be non-empty"
 
 open' :: [Inl Simple] -> Sentence 'Open Simple
-open' = OpenSentence 
-  . fromMaybe (error "list should be nonEmpty") 
-  . NE.nonEmpty
+open' =
+  OpenSentence
+    . fromMaybe (error "list should be nonEmpty")
+    . NE.nonEmpty
 
 closed' :: [Inl Simple] -> [End] -> Sentence 'Closed Simple
-closed' inl ends = ClosedSentence 
-  ( fromMaybe (error "words should be nonEmpty") 
-  $ NE.nonEmpty inl
-  )
-  ( fromMaybe (error "ends should be nonEmpty") 
-  $ NE.nonEmpty ends
-  )
+closed' inl ends =
+  ClosedSentence
+    ( fromMaybe (error "words should be nonEmpty") $
+        NE.nonEmpty inl
+    )
+    ( fromMaybe (error "ends should be nonEmpty") $
+        NE.nonEmpty ends
+    )
 
 mark' :: Mark -> Inl Simple
 mark' = Inline' . Mark
 
 -- (<.) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
 -- (<.) = endWith Period
--- 
+--
 -- (<!) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
 -- (<!) = endWith Exclamation
--- 
+--
 -- (<?) :: SentenceBuilder e -> [Inl e] -> SentenceBuilder e
 -- (<?) = endWith Question
--- 
+--
 -- endWith :: End -> SentenceBuilder e -> [Inl e] -> SentenceBuilder e
 -- endWith end sbs is = case sbs of
 --   Current ne rest -> case NE.nonEmpty is of
---     Just xs -> 
---       Current (sen $ OpenSentence xs) 
+--     Just xs ->
+--       Current (sen $ OpenSentence xs)
 --       $ sen (ClosedSentence ne (end NE.:| []) : rest)
---     Nothing -> 
---       AllClosed 
+--     Nothing ->
+--       AllClosed
 --       $ ClosedSentence ne (end NE.:| []) NE.:| rest
 --   AllClosed (ClosedSentence ne ends NE.:| rest) -> case NE.nonEmpty is of
---     Just xs -> 
---       Current xs 
+--     Just xs ->
+--       Current xs
 --       $ Sentence ne (end NE.<| ends) : rest
---     Nothing -> 
---       AllClosed 
+--     Nothing ->
+--       AllClosed
 --       $ Sentence ne (end NE.<| ends) NE.:| rest
 
 comma' :: Inline'
@@ -122,4 +125,3 @@ number' = Inline' . Number
 
 verbatim' :: Text.Text -> Inline'
 verbatim' = Inline' . Verbatim
-

@@ -1,5 +1,5 @@
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
@@ -14,8 +14,8 @@ import Data.Functor.Identity
 import System.FilePath.Glob (glob)
 
 -- text
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
+import Data.Text qualified as Text
+import Data.Text.IO qualified as Text
 
 -- mtl
 import Control.Monad.Reader
@@ -27,15 +27,16 @@ import Prose.Doc
 import Prose.Simple
 import Prose.Text.Parser
 import Prose.Text.Serializer
+
 -- import Prose.Text.Markdown (serialize, SimpleSerializer, sI, sB, sDoc, sBlock,
 --                          simpleSerializeConfig)
 
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 
-import SpecHelper
 import Prose.DocSpec
 import Prose.Recursion
+import SpecHelper
 
 spec :: SpecWith ()
 spec = do
@@ -57,19 +58,18 @@ specInline = describe "inline" do
   ex "@ref" $ Reference "ref"
 
   describe "simple inlines" do
-    myTripping 
+    myTripping
       (onInl genSimpleR)
       (overInl serializeSimpleR)
       (onInl parseSimpleR)
-  
+
   describe "simple sentences" do
     serializeRoundtrip
       (toSentences genSimple)
       (fromSentences serializeSimple)
       (toSentences parseSimple)
-
  where
-   ex txt rst = it ("should parse " ++ show txt) do
+  ex txt rst = it ("should parse " ++ show txt) do
     case runParser (onInl parseSimpleR <* eof) "hello" txt of
       Left err -> expectationFailure (errorBundlePretty err)
       Right d -> d `shouldBe` Inline' rst
@@ -77,8 +77,8 @@ specInline = describe "inline" do
 specBlock :: Spec
 specBlock = describe "block" do
   describe "single blocks" do
-    myTripping 
-      (toBlock genSimple) 
+    myTripping
+      (toBlock genSimple)
       (fromBlock serializeSimple)
       (toBlock parseSimple)
 
@@ -99,12 +99,11 @@ specSectionText = describe "section text" do
     it "should parse" do
       parseOrFail parser txt \a -> do
         a `shouldSatisfy` (>= 0) . length
-  
+
   onCanonicalFiles \txt -> do
     it "should parse" do
       parseOrFail parser txt \a -> do
         a `shouldSatisfy` (>= 0) . length
-
 
 specSection :: Spec
 specSection = describe "section" do
@@ -112,30 +111,30 @@ specSection = describe "section" do
   "# ," `correctsTo` "# ,\n"
 
   modifyMaxSuccess (const 20) $
-    myTripping 
+    myTripping
       (onSec genSimpleR)
       (overSec serializeSimpleR)
       (onSec parseSimpleR)
-
-  where
-   ex txt = it ("should parse " ++ show txt) do
+ where
+  ex txt = it ("should parse " ++ show txt) do
     case parse (toSection parseSimple <* eof) "section" txt of
       Left err -> expectationFailure (errorBundlePretty err)
       Right _ -> return ()
 
-   correctsTo txt txt2 = it 
-      ("should correct " ++ show txt ++ " to " ++ show txt2) do
-    case parse (toSection parseSimple <* eof) "section" txt of
-      Left err -> expectationFailure (errorBundlePretty err)
-      Right d ->
-        fromSection serializeSimple d `shouldBe` txt2
+  correctsTo txt txt2 = it
+    ("should correct " ++ show txt ++ " to " ++ show txt2)
+    do
+      case parse (toSection parseSimple <* eof) "section" txt of
+        Left err -> expectationFailure (errorBundlePretty err)
+        Right d ->
+          fromSection serializeSimple d `shouldBe` txt2
 
 serializeRoundtrip ::
-  (Show x, Eq x)
-  => Gen x
-  -> (x -> Text.Text)
-  -> Parser x
-  -> Spec
+  (Show x, Eq x) =>
+  Gen x ->
+  (x -> Text.Text) ->
+  Parser x ->
+  Spec
 serializeRoundtrip gen s p = prop "can serialize and parse" do
   i <- forAll gen
   let txt = s i
@@ -148,27 +147,28 @@ serializeRoundtrip gen s p = prop "can serialize and parse" do
       txt === s x
 
 myTripping ::
-  (Show x, Eq x)
-  => Gen x
-  -> (x -> Text.Text)
-  -> Parser x
-  -> Spec
+  (Show x, Eq x) =>
+  Gen x ->
+  (x -> Text.Text) ->
+  Parser x ->
+  Spec
 myTripping gen s p = prop "can serialize and parse" do
   i <- forAll gen
   tripping i s (runParser (p <* eof) "test")
 
-
 specAllDataFiles :: Spec
 specAllDataFiles = describe "on **/*.prs" do
- onGoodFiles \txt -> do
-   it "can parse - serialize - parse" do
-     parseOrFail (onSec parseSimpleR) txt \d -> do
-       parseOrFail (onSec parseSimpleR) (overSec serializeSimpleR d)
-        (`shouldBe` d)
- onCanonicalFiles \txt -> do
-   it "can parse - serialize" do
-     parseOrFail (onSec parseSimpleR) txt \d -> do
-       overSec serializeSimpleR d `shouldBe` txt
+  onGoodFiles \txt -> do
+    it "can parse - serialize - parse" do
+      parseOrFail (onSec parseSimpleR) txt \d -> do
+        parseOrFail
+          (onSec parseSimpleR)
+          (overSec serializeSimpleR d)
+          (`shouldBe` d)
+  onCanonicalFiles \txt -> do
+    it "can parse - serialize" do
+      parseOrFail (onSec parseSimpleR) txt \d -> do
+        overSec serializeSimpleR d `shouldBe` txt
 
 onGoodFiles :: (Text.Text -> SpecWith ()) -> SpecWith ()
 onGoodFiles k = do

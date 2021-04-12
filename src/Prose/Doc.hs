@@ -11,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+
 module Prose.Doc where
 
 -- base
@@ -39,38 +40,41 @@ class DocR e where
   type OpenSen e :: *
   type ClosedSen e :: *
 
-class 
+class
   ( DocR e
   , Show (Sec e)
   , Show (Blk e)
   , Show (Inl e)
   , Show (OpenSen e)
   , Show (ClosedSen e)
-  ) => ShowR e where
+  ) =>
+  ShowR e
 
-class 
+class
   ( DocR e
   , Eq (Sec e)
   , Eq (Blk e)
   , Eq (Inl e)
   , Eq (OpenSen e)
   , Eq (ClosedSen e)
-  ) => EqR e where
-class 
+  ) =>
+  EqR e
+class
   ( EqR e
   , Ord (Sec e)
   , Ord (Blk e)
   , Ord (Inl e)
   , Ord (OpenSen e)
   , Ord (ClosedSen e)
-  ) => OrdR e where
+  ) =>
+  OrdR e
 
 -- | A Section
 data Section e = Section
   { sectionTitle :: Sentences e
   , sectionContent :: [Blk e]
   , sectionSubs :: [Sec e]
-  } 
+  }
   deriving (Generic)
 
 deriving instance EqR e => Eq (Section e)
@@ -133,7 +137,7 @@ instance ShowR e => Show (Sentences e) where
 -- data AnySen e = forall b. AnySen { getAnySen :: Sen e b }
 
 data Sentence a e where
-  ClosedSentence   :: NE.NonEmpty (Inl e) -> NE.NonEmpty End -> Sentence 'Closed e
+  ClosedSentence :: NE.NonEmpty (Inl e) -> NE.NonEmpty End -> Sentence 'Closed e
   OpenSentence :: NE.NonEmpty (Inl e) -> Sentence 'Open e
 
 deriving instance EqR e => Eq (Sentence a e)
@@ -167,7 +171,7 @@ data Inline e
   = Word !Text.Text
   | Reference !Text.Text
   | Mark !Mark
-  | Emdash 
+  | Emdash
   | Verbatim !Text.Text
   | Number !Text.Text
   | Qouted (QoutedSentences e)
@@ -176,7 +180,7 @@ deriving instance EqR e => Eq (Inline e)
 deriving instance OrdR e => Ord (Inline e)
 deriving instance ShowR e => Show (Inline e)
 
-data Mark 
+data Mark
   = Comma
   | Colon
   | SemiColon
@@ -194,7 +198,7 @@ fromSentenceBuilder = \case
   go :: Maybe (Sentences e) -> NE.NonEmpty (ClosedSen e) -> Sentences e
   go x (s NE.:| ss) = case NE.nonEmpty ss of
     Nothing -> ClosedSentences s x
-    Just rst-> go (Just $ ClosedSentences s x) rst
+    Just rst -> go (Just $ ClosedSentences s x) rst
 
 toSentenceBuilder :: Sentences e -> SentenceBuilder e
 toSentenceBuilder = go []
@@ -202,12 +206,11 @@ toSentenceBuilder = go []
   go ss = \case
     OpenSentences s -> Current s ss
     ClosedSentences s r -> case r of
-      Just r' -> go (s:ss) r'
+      Just r' -> go (s : ss) r'
       Nothing -> AllClosed (s NE.:| ss)
 
-
-data SentenceBuilder e =
-  Current (OpenSen e) [ClosedSen e]
+data SentenceBuilder e
+  = Current (OpenSen e) [ClosedSen e]
   | AllClosed (NE.NonEmpty (ClosedSen e))
 
 deriving instance EqR e => Eq (SentenceBuilder e)
