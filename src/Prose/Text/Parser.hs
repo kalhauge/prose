@@ -258,13 +258,15 @@ parserR pSec app = DocCoAlgebra{..}
     return $ Text.cons c (Text.concat txt)
 
   toBlock = label "block" do
-    choice
+    c <- choice
       [ comment
       , orderedItems
       , items
       , codeblock
       , para
       ]
+    void . optional $ try (many eol *> eof)
+    return c
    where
     orderedItems =
       label "ordered items" $

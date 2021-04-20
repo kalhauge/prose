@@ -91,9 +91,9 @@ specSectionText = describe "section text" do
       a `shouldSatisfy` (== 1) . length
 
   onFile "test/data/good/simple.prs" \txt -> do
-    it "should contain 2 headers" do
+    it "should contain 3 headers" do
       parseOrFail parser txt \a -> do
-        a `shouldSatisfy` (== 2) . length
+        a `shouldSatisfy` (== 3) . length
 
   onGoodFiles \txt -> do
     it "should parse" do
