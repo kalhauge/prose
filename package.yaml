@@ -33,6 +33,7 @@ dependencies:
 - pandoc-types >= 1.22
 - aeson
 - bytestring
+- lens >= 4.19 && < 5
 
 ghc-options: -Wall -haddock
 

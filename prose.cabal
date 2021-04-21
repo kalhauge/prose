@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a868a0e4c014b676a6f8bc6e49cd1510a865142281cdf131077615114080471e
+-- hash: 4fbb30717fe69b5fc7dba77c6f170573eba75ee7d525eb679d9133b9c5582d65
 
 name:           prose
 version:        0.1.0.0
@@ -51,6 +51,7 @@ library
     , base >=4.7 && <5
     , bytestring
     , contravariant
+    , lens >=4.19 && <5
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative
@@ -73,6 +74,7 @@ executable prose
     , base >=4.7 && <5
     , bytestring
     , contravariant
+    , lens >=4.19 && <5
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative
@@ -114,6 +116,7 @@ test-suite prose-test
     , hspec-discover >=2.7
     , hspec-expectations-pretty-diff
     , hspec-hedgehog
+    , lens >=4.19 && <5
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative

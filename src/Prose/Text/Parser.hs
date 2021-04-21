@@ -337,11 +337,11 @@ parserR pSec app = DocCoAlgebra{..}
 
   toNumeralItem = label "numeral item" do
     _ <- pNumeralType
-    let orderedItemTodo = Nothing
+    let _orderedItemTodo = Nothing
     indent do
-      orderedItemTitle <- toSentences
+      _orderedItemTitle <- toSentences
       dbg "empty" (eof <|> pEmptyLine)
-      orderedItemContents <-
+      _orderedItemContents <-
         label "item content" $
           choice
             [ NE.toList <$> pBlocks app
@@ -354,12 +354,12 @@ parserR pSec app = DocCoAlgebra{..}
       <* hspace1
 
   toItem = label "item" do
-    itemType <- try (hspace *> pItemType)
-    let itemTodo = Nothing
+    _itemType <- try (hspace *> pItemType)
+    let _itemTodo = Nothing
     indent do
-      itemTitle <- toSentences
+      _itemTitle <- toSentences
       dbg "empty" (eof <|> pEmptyLine)
-      itemContents <-
+      _itemContents <-
         label "item content" $
           choice
             [ NE.toList <$> pBlocks app
@@ -381,18 +381,18 @@ parserR pSec app = DocCoAlgebra{..}
     pDoc pSec pSection
 
   pSection = do
-    sectionTitle <- label "section header" $ singleline toSentences
+    _sectionTitle <- label "section header" $ singleline toSentences
     choice
       [ do
-          let sectionContent = []
+          let _sectionContent = []
           dbg "eof" eof
-          return $ \sectionSubs -> Section{..}
+          return $ \_sectionSubs -> Section{..}
       , do
           _ <- many pEmptyLine
-          sectionContent <-
+          _sectionContent <-
             maybe [] NE.toList
               <$> optional (pBlocks app)
-          return $ \sectionSubs -> Section{..}
+          return $ \_sectionSubs -> Section{..}
       ]
 
 pIndent :: P ()

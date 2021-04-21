@@ -38,9 +38,9 @@ toPandoc = DocMap $ Instance{..}
  where
   onSec Section{..} n =
     fold
-      [ PD.header n (pandocSentences sectionTitle)
-      , fold sectionContent
-      , foldMap ($ n + 1) sectionSubs
+      [ PD.header n (pandocSentences _sectionTitle)
+      , fold _sectionContent
+      , foldMap ($ n + 1) _sectionSubs
       ]
 
   onBlk = \case

@@ -89,9 +89,9 @@ generateR ::
 generateR Instance{..} = DocCoAlgebra{..}
  where
   toSection = do
-    sectionTitle <- toSentences
-    sectionContent <- Gen.list (Range.linear 0 3) onBlk
-    sectionSubs <-
+    _sectionTitle <- toSentences
+    _sectionContent <- Gen.list (Range.linear 0 3) onBlk
+    _sectionSubs <-
       Gen.recursive
         Gen.choice
         [pure []]

@@ -11,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Prose.Doc where
 
@@ -18,6 +19,9 @@ module Prose.Doc where
 import Data.List.NonEmpty qualified as NE
 import GHC.Generics (Generic)
 import Prelude hiding (Word)
+
+-- lens
+import Control.Lens
 
 -- text
 import Data.Text qualified as Text
@@ -71,11 +75,12 @@ class
 
 -- | A Section
 data Section e = Section
-  { sectionTitle :: Sentences e
-  , sectionContent :: [Blk e]
-  , sectionSubs :: [Sec e]
+  { _sectionTitle :: Sentences e
+  , _sectionContent :: [Blk e]
+  , _sectionSubs :: [Sec e]
   }
   deriving (Generic)
+
 
 deriving instance EqR e => Eq (Section e)
 deriving instance OrdR e => Ord (Section e)
@@ -93,10 +98,10 @@ deriving instance OrdR e => Ord (Block e)
 deriving instance ShowR e => Show (Block e)
 
 data Item e = Item
-  { itemType :: ItemType
-  , itemTodo :: Maybe Bool
-  , itemTitle :: Sentences e
-  , itemContents :: [Blk e]
+  { _itemType :: ItemType
+  , _itemTodo :: Maybe Bool
+  , _itemTitle :: Sentences e
+  , _itemContents :: [Blk e]
   }
 
 deriving instance EqR e => Eq (Item e)
@@ -110,9 +115,9 @@ data ItemType
   deriving (Eq, Show, Enum, Bounded, Ord)
 
 data OrderedItem e = OrderedItem
-  { orderedItemTodo :: Maybe Bool
-  , orderedItemTitle :: Sentences e
-  , orderedItemContents :: [Blk e]
+  { _orderedItemTodo :: Maybe Bool
+  , _orderedItemTitle :: Sentences e
+  , _orderedItemContents :: [Blk e]
   }
 
 deriving instance EqR e => Eq (OrderedItem e)
@@ -216,3 +221,9 @@ data SentenceBuilder e
 deriving instance EqR e => Eq (SentenceBuilder e)
 deriving instance OrdR e => Ord (SentenceBuilder e)
 deriving instance ShowR e => Show (SentenceBuilder e)
+
+makeLenses ''Section
+makeLenses ''Item
+makeLenses ''OrderedItem
+makePrisms ''Block
+makePrisms ''Inline

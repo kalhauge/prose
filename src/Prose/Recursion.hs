@@ -258,9 +258,9 @@ hyloM dist project embed = extract
 instance DocFunctor Section where
   mapDoc e Section{..} =
     Section
-      (mapDoc e sectionTitle)
-      (overBlk e <$> sectionContent)
-      (overSec e <$> sectionSubs)
+      (mapDoc e _sectionTitle)
+      (overBlk e <$> _sectionContent)
+      (overSec e <$> _sectionSubs)
 
 instance DocFunctor Sentences where
   mapDoc e = \case
@@ -297,16 +297,16 @@ instance DocFunctor QoutedSentences where
 instance DocFunctor Item where
   mapDoc e Item{..} =
     Item
-      { itemTitle = mapDoc e itemTitle
-      , itemContents = overBlk e <$> itemContents
+      { _itemTitle = mapDoc e _itemTitle
+      , _itemContents = overBlk e <$> _itemContents
       , ..
       }
 
 instance DocFunctor OrderedItem where
   mapDoc e OrderedItem{..} =
     OrderedItem
-      { orderedItemTitle = mapDoc e orderedItemTitle
-      , orderedItemContents = overBlk e <$> orderedItemContents
+      { _orderedItemTitle = mapDoc e _orderedItemTitle
+      , _orderedItemContents = overBlk e <$> _orderedItemContents
       , ..
       }
 
@@ -389,9 +389,9 @@ foldDoc :: forall m. Monoid m => DocAlgebra (Value m) m
 foldDoc = DocAlgebra{..}
  where
   fromSection Section{..} =
-    fromSentences sectionTitle
-      <> fold sectionContent
-      <> fold sectionSubs
+    fromSentences _sectionTitle
+      <> fold _sectionContent
+      <> fold _sectionSubs
 
   fromBlock = \case
     Para s -> fromSentences s
@@ -403,12 +403,12 @@ foldDoc = DocAlgebra{..}
       foldMap fromOrderedItem its
 
   fromItem Item{..} =
-    fromSentences itemTitle
-      <> fold itemContents
+    fromSentences _itemTitle
+      <> fold _itemContents
 
   fromOrderedItem OrderedItem{..} =
-    fromSentences orderedItemTitle
-      <> fold orderedItemContents
+    fromSentences _orderedItemTitle
+      <> fold _orderedItemContents
 
   fromInline = \case
     Qouted a -> fromQoutedSentences a
@@ -546,10 +546,10 @@ fromCoAlgebra' emb DocCoAlgebra{..} =
 
 -- | An Item tree.
 data ItemTree e = ItemTree
-  { itemTreeType :: ItemType
-  , itemTreeTodo :: Maybe Bool
-  , itemTreeTitle :: Sentences e
-  , itemTreeContents :: [ItemTree e]
+  { _itemTreeType :: ItemType
+  , _itemTreeTodo :: Maybe Bool
+  , _itemTreeTitle :: Sentences e
+  , _itemTreeContents :: [ItemTree e]
   }
 
 -- instance ProjectableR (ItemTree e) where
@@ -569,16 +569,16 @@ compressItems blk = case overBlk (projectR @e) blk of
 
 compressItem :: forall e. ProjectableR e => Item e -> Maybe (ItemTree e)
 compressItem Item{..} = do
-  itemTreeContents <- case itemContents of
+  _itemTreeContents <- case _itemContents of
     [blk] -> NE.toList <$> compressItems blk
     [] -> return []
     _ -> Nothing
 
   pure $
     ItemTree
-      { itemTreeTitle = itemTitle
-      , itemTreeTodo = itemTodo
-      , itemTreeType = itemType
+      { _itemTreeTitle = _itemTitle
+      , _itemTreeTodo = _itemTodo
+      , _itemTreeType = _itemType
       , ..
       }
 

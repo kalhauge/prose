@@ -176,14 +176,14 @@ serializeX ::
 serializeX SerializeHandler{..} ex = DocAlgebra{..}
  where
   fromSection Section{..} =
-    sHeader <> " " <> singleline (fromSentences sectionTitle) <> sEndLine
-      <> ( case NE.nonEmpty sectionContent of
+    sHeader <> " " <> singleline (fromSentences _sectionTitle) <> sEndLine
+      <> ( case NE.nonEmpty _sectionContent of
             Just blks -> sEndLine <> sIntercalate sCfgBlockSep (overBlk ex) blks
             Nothing -> mempty
          )
       <> foldMap
         (\s -> sEndLine <> increaseHeader (overSec ex s))
-        sectionSubs
+        _sectionSubs
 
   fromSentences = \case
     OpenSentences sen ->

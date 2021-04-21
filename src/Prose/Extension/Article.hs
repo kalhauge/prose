@@ -81,8 +81,8 @@ toDoc :: Article -> Section'
 toDoc Article{..} =
   Section' $
     Section
-      { sectionTitle = articleTitle
-      , sectionContent =
+      { _sectionTitle = articleTitle
+      , _sectionContent =
           concat
             [ case NE.nonEmpty articleAuthors of
                 Just _ ->
@@ -100,7 +100,7 @@ toDoc Article{..} =
             , Block' . para <$> articleAbstract
             , []
             ]
-      , sectionSubs = articleSections
+      , _sectionSubs = articleSections
       }
 
 toPandoc :: Article -> P.Pandoc

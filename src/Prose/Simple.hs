@@ -106,11 +106,11 @@ showDoc = DocAlgebra{..}
   fromSection Section{..} n =
     showParen (n > app_prec) $
       showString "sec' "
-        . fromSentences sectionTitle (app_prec + 1)
+        . fromSentences _sectionTitle (app_prec + 1)
         . showChar ' '
-        . showListWith ($ 0) sectionContent
+        . showListWith ($ 0) _sectionContent
         . showChar ' '
-        . showListWith ($ 0) sectionSubs
+        . showListWith ($ 0) _sectionSubs
 
   fromBlock blk n = case blk of
     Para s ->
