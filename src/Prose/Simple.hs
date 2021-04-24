@@ -1,6 +1,9 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -11,12 +14,14 @@
 module Prose.Simple where
 
 -- base
-
 import Control.Category
 import Data.List.NonEmpty qualified as NE
 import Data.Monoid
 import Text.Show
 import Prelude hiding (id, (.))
+
+-- lens
+import Control.Lens hiding (Simple)
 
 -- text
 import Data.Text qualified as Text
@@ -38,6 +43,8 @@ instance ShowR Simple
 
 type Doc = Section'
 
+
+
 newtype Section' = Section'
   {getSection :: Section Simple}
   deriving (Eq, Ord)
@@ -58,6 +65,8 @@ newtype Inline' = Inline'
 
 instance Show Inline' where
   showsPrec = flip (overInl showSimple)
+
+
 
 type Item' = Item Simple
 
@@ -82,6 +91,7 @@ instance EmbedableR Simple where
         , onOpenSen = id
         , onClosedSen = id
         }
+
 
 showSimple :: Extractor Simple (Int -> ShowS)
 showSimple = extractR showDoc
@@ -194,113 +204,21 @@ showDoc = DocAlgebra{..}
 
   app_prec = 10
 
---
+makeWrapped ''Section'
+makeWrapped ''Block'
+makeWrapped ''Inline'
 
--- instance ShowR e => Show (SentenceBuilder e) where
---   showsPrec n = showParen (n > app_prec) . \case
---     AllClosed sens -> handleRest sens []
---     Current i lst ->
---       case NE.nonEmpty lst of
---         Nothing -> showString "sb " . shows (NE.toList i)
---         Just sens -> handleRest sens (NE.toList i)
---
---    where
---     handleRest :: NE.NonEmpty (Sen e 'Closed) -> [Inl e] -> ShowS
---     handleRest (ClosedSentences i (e NE.:| ends)  NE.:| ns) m =
---       ( case NE.nonEmpty ends of
---         Just moreEnds -> shows (AllClosed (Sentence i moreEnds NE.:| ns))
---         Nothing -> shows (Current i ns)
---       )
---       . showsEnd e
---       . shows m
---
---     app_prec = 10
---
---     -- go (Sentence s (e NE.:| _) NE.:| rest)= case NE.nonEmpty rest of
---     --  Nothing -> showString "sb " . shows (NE.toList s) . showsEnd e
---     --  Just rest' -> go rest' . shows (NE.toList s) . showsEnd e
---
---     showsEnd :: End -> ShowS
---     showsEnd = \case
---      Exclamation -> showString " <! "
---      Question -> showString " <? "
---      Period -> showString " <. "
+instance LensR Simple where
+  lSec = _Wrapped
+  lBlk = _Wrapped
+  lInl = _Wrapped
+  lOpenSen = iso id id
+  lClosedSen = iso id id
 
--- instance Show Section' where
---   showsPrec n (Section' s) =
---     showParen (n > app_prec) (showString "Section' " . showsPrec (app_prec + 1) s)
---    where app_prec = 10
---
--- instance Show Block' where
---   showsPrec n (Block' s) = case s of
---     Comment txt -> showParen (n > app_prec) $
---       showString "comment' " . shows (Text.intercalate "\n" txt)
---     Para p -> showParen (n > app_prec) $
---       showString "para' " . showsPrec (app_prec + 1) (toSentenceBuilder p)
---     Items it -> showParen (n > app_prec) $
---       showString "items' " . showListWith showsItem (NE.toList it)
---     OrderedItems ot it -> showParen (n > app_prec) $
---       showString "ordered' " . shows ot
---       . showChar ' ' . showListWith showsOrderedItem (NE.toList it)
---    where
---     app_prec = 10
---     showsItem = \case
---       Item Minus Nothing x b ->
---         showString "item' "
---         . showsPrec (app_prec + 1) (toSentenceBuilder x)
---         . showChar ' ' . shows b
---       Item Minus (Just t) x b ->
---         showString "todo' " . shows t . showChar ' '
---         . showsPrec (app_prec + 1) (toSentenceBuilder x)
---         . showChar ' ' . shows b
---       i -> shows i
---     showsOrderedItem (OrderedItem t x b) = case t of
---       Nothing ->
---         showString "oitem' "
---         . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder x)
---         . showChar ' ' . shows b
---       Just t' ->
---         showString "otodo' " . shows t' . showChar ' '
---         . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder x)
---         . showChar ' ' . shows b
---
---
--- instance Show Inline' where
---   showsPrec n (Inline' s) = case s of
---     Comma -> showString "comma'"
---     Colon -> showString "colon'"
---     SemiColon -> showString "semicolon'"
---     Word w -> showParen (n > app_prec) $
---         showString "word' " . showsPrec (app_prec + 1) w
---     Verbatim w -> showParen (n > app_prec) $
---         showString "verbatim' " . showsPrec (app_prec + 1) w
---     Number w -> showParen (n > app_prec) $
---         showString "number' " . showsPrec (app_prec + 1) w
---     Reference r -> showParen (n > app_prec) $
---         showString "ref' " . showsPrec (app_prec + 1) r
---     Qouted w ->
---       showsQoutedSentences n w
---    where app_prec = 10
---
--- -- | Shows an inline with an Inline in.
--- showsInline :: Int -> Inline Inline' -> ShowS
--- showsInline n = \case
---   Qouted w -> showsQoutedSentences n w
---   a -> showsPrec n a
---
--- showsQoutedSentences :: Int -> QoutedSentences Inline' -> ShowS
--- showsQoutedSentences n (QoutedSentences qute x) =
---   showParen (n > app_prec) $ showString str . showsPrec (app_prec + 1) (toSentenceBuilder x)
---  where
---    app_prec = 10
---    str = case qute of
---      Brackets -> "brackets' "
---      Parenthesis -> "parens' "
---      DoubleQoute -> "dqoute' "
---      Emph -> "emph' "
---      Strong -> "strong' "
---
--- showsSentences :: Int -> Sentences Inline' -> ShowS
--- showsSentences n s = showParen (n > app_prec) $
---   showString "sen' " . showsPrec (app_prec + 1) (getInline <$> toSentenceBuilder s)
---  where app_prec = 10
+instance CoLensR Simple where
+  colSec = _Unwrapped
+  colBlk = _Unwrapped
+  colInl = _Unwrapped
+  colOpenSen = iso id id
+  colClosedSen = iso id id
+

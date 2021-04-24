@@ -29,6 +29,7 @@ dependencies:
 - mtl >= 2.2.2 && < 3
 - template-haskell
 - contravariant
+- containers >= 0.6 && <= 0.7
 - optparse-applicative
 - pandoc-types >= 1.22
 - aeson

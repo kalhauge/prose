@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4fbb30717fe69b5fc7dba77c6f170573eba75ee7d525eb679d9133b9c5582d65
+-- hash: fb9fca20ebe9a28933ce25c0a72d65ac4117d72d349c8439e83b8781d40fb058
 
 name:           prose
 version:        0.1.0.0
@@ -50,6 +50,7 @@ library
       aeson
     , base >=4.7 && <5
     , bytestring
+    , containers >=0.6 && <=0.7
     , contravariant
     , lens >=4.19 && <5
     , megaparsec >=9.0 && <11
@@ -73,6 +74,7 @@ executable prose
       aeson
     , base >=4.7 && <5
     , bytestring
+    , containers >=0.6 && <=0.7
     , contravariant
     , lens >=4.19 && <5
     , megaparsec >=9.0 && <11
@@ -108,6 +110,7 @@ test-suite prose-test
     , aeson
     , base
     , bytestring
+    , containers >=0.6 && <=0.7
     , contravariant
     , doctest
     , hedgehog

@@ -5,6 +5,8 @@
 
 module Prose.Annotated where
 
+import Control.Lens hiding (Simple)
+
 import Prose.Doc
 import Prose.Recursion
 import Prose.Simple
@@ -48,6 +50,31 @@ instance ProjectableR (Ann a) where
         , onOpenSen = \(AnnSentence _ a) -> a
         , onClosedSen = \(AnnSentence _ a) -> a
         }
+
+unAnnSec :: Lens' (AnnSection a) (Section (Ann a))
+unAnnSec =
+  lens (overSec projectR) (\(AnnSection a _) -> AnnSection a)
+
+unAnnBlk :: Lens' (AnnBlock a) (Block (Ann a))
+unAnnBlk =
+  lens (overBlk projectR) (\(AnnBlock a _) -> AnnBlock a)
+
+unAnnInl :: Lens' (AnnInline a) (Inline (Ann a))
+unAnnInl =
+  lens (overInl projectR) (\(AnnInline a _) -> AnnInline a)
+
+unAnnSen :: Lens' (AnnSentence b a) (Sentence b (Ann a))
+unAnnSen =
+  lens
+    (\(AnnSentence _ b) -> b)
+    (\(AnnSentence a _) -> AnnSentence a)
+
+instance LensR (Ann a) where
+  lSec = unAnnSec
+  lBlk = unAnnBlk
+  lInl = unAnnInl
+  lOpenSen = unAnnSen
+  lClosedSen = unAnnSen
 
 withConst :: a -> Unfix (Ann a) ~:> Ann a
 withConst a =

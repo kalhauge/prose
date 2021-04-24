@@ -17,13 +17,15 @@
 module Prose.Recursion where
 
 -- base
-
 import Control.Category
 import Data.Foldable
 import Data.Functor.Identity
 import Data.List.NonEmpty qualified as NE
 import Data.Monoid
 import Prelude hiding (Word, id, (.))
+
+-- lens 
+import Control.Lens
 
 -- mtl
 import Control.Monad.Reader
@@ -202,6 +204,20 @@ class DocR e => ProjectableR e where
 
 class DocR e => EmbedableR e where
   embedR :: Unfix e ~:> e
+
+class ProjectableR e => LensR e where
+  lSec :: Lens' (Sec e) (Section e)
+  lBlk :: Lens' (Blk e) (Block e)
+  lInl :: Lens' (Inl e) (Inline e)
+  lOpenSen :: Lens' (OpenSen e) (Sentence 'Open e)
+  lClosedSen :: Lens' (ClosedSen e) (Sentence 'Closed e)
+
+class EmbedableR e => CoLensR e where
+  colSec :: Lens' (Section e) (Sec e) 
+  colBlk :: Lens' (Block e) (Blk e) 
+  colInl :: Lens' (Inline e) (Inl e) 
+  colOpenSen :: Lens' (Sentence 'Open e) (OpenSen e) 
+  colClosedSen :: Lens' (Sentence 'Closed e) (ClosedSen e) 
 
 embedRM ::
   (EmbedableR e, Applicative m) =>

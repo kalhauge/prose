@@ -59,31 +59,36 @@ parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) alg
 parseSimpleR :: Generator Parser Simple
 parseSimpleR = fromCoAlgebra embedRM parseSimple
 
+parseAnnotatedR :: Generator Parser (Ann SourcePos)
+parseAnnotatedR = gen
+ where
+  (gen, alg) = anaA' annotate (parserR (overSec annotate))
+
 parseAnnotated :: DocCoAlgebra Parser (Ann SourcePos)
 parseAnnotated = natCoAlgebra (`runReaderT` defaultParserConfig) alg
  where
   (_, alg) = anaA' annotate (parserR (overSec annotate))
 
-  annotate :: Apply P (Unfix (Ann SourcePos)) ~:> Apply P (Ann SourcePos)
-  annotate =
-    DocMap $
-      Instance
-        { onSec = \pSec -> do
-            pos <- getSourcePos
-            AnnSection pos <$> pSec
-        , onBlk = \pBlk -> do
-            pos <- getSourcePos
-            AnnBlock pos <$> pBlk
-        , onInl = \pInl -> do
-            pos <- getSourcePos
-            AnnInline pos <$> pInl
-        , onOpenSen = \pSen -> do
-            pos <- getSourcePos
-            AnnSentence pos <$> pSen
-        , onClosedSen = \pSen -> do
-            pos <- getSourcePos
-            AnnSentence pos <$> pSen
-        }
+annotate :: Apply P (Unfix (Ann SourcePos)) ~:> Apply P (Ann SourcePos)
+annotate =
+  DocMap $
+    Instance
+      { onSec = \pSec -> do
+          pos <- getSourcePos
+          AnnSection pos <$> pSec
+      , onBlk = \pBlk -> do
+          pos <- getSourcePos
+          AnnBlock pos <$> pBlk
+      , onInl = \pInl -> do
+          pos <- getSourcePos
+          AnnInline pos <$> pInl
+      , onOpenSen = \pSen -> do
+          pos <- getSourcePos
+          AnnSentence pos <$> pSen
+      , onClosedSen = \pSen -> do
+          pos <- getSourcePos
+          AnnSentence pos <$> pSen
+      }
 
 type Parser = Parsec Void Text.Text
 

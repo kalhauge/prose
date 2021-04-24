@@ -16,7 +16,8 @@ import System.IO (stderr, stdin, stdout)
 import Text.Pandoc.Definition qualified as PD
 
 -- optparse
-import Options.Applicative
+-- optparse
+import Options.Applicative hiding (Success)
 
 -- text
 import Data.Text qualified as Text
@@ -29,20 +30,25 @@ import Data.ByteString.Lazy qualified as BL
 import Text.Megaparsec
 
 -- aeson
-import Data.Aeson
+-- aeson
+import Data.Aeson hiding (Success)
 
+import Prose.Doc
 import Prose.Pandoc
 import Prose.Recursion
 import Prose.Simple
+import Prose.Internal.DocParser
+import Prose.Internal.Validation
+import Prose.Annotated
 import Prose.Text.Parser qualified as P
 import Prose.Text.Serializer qualified as S
 
--- import Prose.Extension.Article qualified as Article
+import Prose.Extension.Article qualified as Article
 
-data DocumentType = forall a e.
-  Show e =>
+data DocumentType = forall a.
+  Show a =>
   DocumentType
-  { dtFromSection' :: Section' -> Either e a
+  { dtFromSection' :: AnnSection SourcePos -> Validation Fault a
   , dtToSection' :: a -> Section'
   , dtToPandoc :: a -> PD.Pandoc
   }
@@ -60,15 +66,16 @@ parseConfig :: Parser Config
 parseConfig = do
   cfgDocumentType <-
     choice
-      -- [ DocumentType
-      --   { dtToPandoc = Article.toPandoc
-      --   , dtFromSection' = Article.fromDoc
-      --   , dtToSection' = Article.toDoc
-      --   } `flag'` long "article"
-      [ pure $
+      [ DocumentType
+          { dtToPandoc = Article.toPandoc
+          , dtFromSection' = Article.fromDoc
+          , dtToSection' = Article.toDoc
+          }
+          `flag'` long "article"
+      , pure $
           DocumentType
             { dtToPandoc = toPandocDoc
-            , dtFromSection' = Right :: a -> Either () a
+            , dtFromSection' = \(AnnSection _ e) -> Success . Section' $ mapDoc toSimple e
             , dtToSection' = id
             }
       ]
@@ -98,7 +105,7 @@ app = do
   handle cfgDocumentType txt cmd
  where
   handle DocumentType{..} txt cmd = do
-    mdoc <- case runParser (onSec P.parseSimpleR) "file" txt of
+    mdoc <- case runParser (onSec P.parseAnnotatedR) "file" txt of
       Left e -> do
         Text.hPutStr stderr (Text.pack $ errorBundlePretty e)
         return Nothing
