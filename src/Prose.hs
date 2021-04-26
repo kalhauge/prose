@@ -17,7 +17,7 @@ import Text.Pandoc.Definition qualified as PD
 
 -- optparse
 -- optparse
-import Options.Applicative hiding (Success)
+import Options.Applicative hiding (Success, Failure)
 
 -- text
 import Data.Text qualified as Text
@@ -110,15 +110,14 @@ app = do
         Text.hPutStr stderr (Text.pack $ errorBundlePretty e)
         return Nothing
       Right doc -> case dtFromSection' doc of
-        Right s -> return $ Just s
-        Left e -> do
+        Success s -> return $ Just s
+        Failure e -> do
           Text.hPutStr stderr (Text.pack $ show e)
           return Nothing
 
     case cmd of
       Format -> case mdoc of
-        Just doc ->
-          Text.hPutStr stdout (overSec S.serializeSimpleR (dtToSection' doc))
+        Just doc -> Text.hPutStr stdout (overSec S.serializeSimpleR (dtToSection' doc))
         Nothing -> Text.hPutStr stdout txt
       Pandoc -> do
         case mdoc of

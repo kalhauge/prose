@@ -25,11 +25,8 @@ import Text.Megaparsec hiding (failure)
 
 import Prose.Doc
 import Prose.Simple
-import Prose.Text.Parser
+import Prose.Text.Parser hiding (annotate)
 import Prose.Text.Serializer
-
--- import Prose.Text.Markdown (serialize, SimpleSerializer, sI, sB, sDoc, sBlock,
---                          simpleSerializeConfig)
 
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range

@@ -1,10 +1,9 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- This is probably not important
 module Prose.Internal.Validation where
@@ -15,8 +14,8 @@ import Control.Monad.State.Class
 -- containers
 import Data.Sequence qualified as Seq
 
-import Data.Bifunctor
 import Control.Applicative
+import Data.Bifunctor
 
 data Validation e a
   = Success a
@@ -53,9 +52,7 @@ instance Monoid e => Monad (Validation e) where
   Success a >>= m = m a
   Failure err >>= _ = Failure err
 
-
-newtype ValidationT m e a =
-  ValidationT { runValidationT :: m (Validation e a)}
+newtype ValidationT m e a = ValidationT {runValidationT :: m (Validation e a)}
 
 class Monad m => MonadValidate e m | m -> e where
   validate :: Validation e a -> m a
@@ -80,9 +77,11 @@ instance Monad m => Alternative (ValidationT m e) where
         a -> return a
 
 instance Monad m => Monad (ValidationT m e) where
-  ValidationT ma >>= fn = ValidationT $ ma >>= \case
-    Success a -> runValidationT (fn a)
-    Failure err -> return $ Failure err
+  ValidationT ma >>= fn =
+    ValidationT $
+      ma >>= \case
+        Success a -> runValidationT (fn a)
+        Failure err -> return $ Failure err
 
 instance Monad m => MonadPlus (ValidationT m e) where
   mzero = empty
@@ -90,5 +89,3 @@ instance Monad m => MonadPlus (ValidationT m e) where
 
 instance MonadState s m => MonadState s (ValidationT m e) where
   state fn = ValidationT (Success <$> state fn)
-
-

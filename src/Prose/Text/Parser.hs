@@ -60,9 +60,9 @@ parseSimpleR :: Generator Parser Simple
 parseSimpleR = fromCoAlgebra embedRM parseSimple
 
 parseAnnotatedR :: Generator Parser (Ann SourcePos)
-parseAnnotatedR = gen
+parseAnnotatedR = mapDoc (natR (`runReaderT` defaultParserConfig)) gen
  where
-  (gen, alg) = anaA' annotate (parserR (overSec annotate))
+  (gen :: Generator P (Ann SourcePos), _) = anaA' annotate (parserR (overSec annotate))
 
 parseAnnotated :: DocCoAlgebra Parser (Ann SourcePos)
 parseAnnotated = natCoAlgebra (`runReaderT` defaultParserConfig) alg

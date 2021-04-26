@@ -13,10 +13,6 @@
 
 module Prose.Extension.Article where
 
--- base
-import Control.Applicative hiding (many, some)
-import Data.Sequence qualified as Seq
-
 -- pandoc-type
 import Text.Pandoc.Builder qualified as P
 
@@ -25,9 +21,6 @@ import Control.Monad.Combinators
 
 -- lens
 import Control.Lens hiding (Simple, para)
-
--- mtl
-import Control.Monad.State
 
 -- base
 import Data.List.NonEmpty qualified as NE
@@ -43,6 +36,7 @@ import Prose.Internal.Validation
 import Prose.Pandoc
 import Prose.Recursion
 import Prose.Simple
+import Prose.Text.Serializer (serializeSimple)
 
 data Author = Author
   { _authorName :: Text.Text
@@ -71,7 +65,22 @@ fromDoc doc = do
       content = sec ^. sectionContent
 
   flip parseAll content do
-    let _articleAuthors = [] -- getAuthors <$> dItemTree
+    _articleAuthors <- fmap concat . many $ dCompressedItems do
+      submatch (const id) (\case 
+        ItemTree _ _ t x 
+          | mapDoc toSimple t == fromSentenceBuilder (sb [word' "by", colon']) ->
+          Success x
+        _ ->
+          Failure (pure $ CouldNotMatch "by:")
+        ) do
+        many (match (\case 
+          ItemTree _ _ n [] ->
+            Success (Author 
+              (fromSentences serializeSimple . mapDoc toSimple $ n) 
+              Nothing)
+          _ -> Failure (pure $ CouldNotMatch "subitems in author")
+          ))
+
     _articleAbstract <- many dPara
     return Article{..}
 
