@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fb9fca20ebe9a28933ce25c0a72d65ac4117d72d349c8439e83b8781d40fb058
+-- hash: a036f928a87ff19dc52d8c22c3899500242e27b0fbbe8b82724f9875c5f4977b
 
 name:           prose
 version:        0.1.0.0
@@ -56,6 +56,7 @@ library
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative
+    , pandoc
     , pandoc-types >=1.22
     , parser-combinators
     , prettyprinter >=1.2
@@ -80,6 +81,7 @@ executable prose
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative
+    , pandoc
     , pandoc-types >=1.22
     , parser-combinators
     , prettyprinter >=1.2
@@ -123,6 +125,7 @@ test-suite prose-test
     , megaparsec >=9.0 && <11
     , mtl >=2.2.2 && <3
     , optparse-applicative
+    , pandoc
     , pandoc-types >=1.22
     , parser-combinators
     , prettyprinter >=1.2

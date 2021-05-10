@@ -48,7 +48,7 @@ instance Alternative (Validation e) where
       Success mb -> Success mb
       Failure e2 -> Failure (e1 Seq.>< e2)
 
-instance Monoid e => Monad (Validation e) where
+instance Monad (Validation e) where
   Success a >>= m = m a
   Failure err >>= _ = Failure err
 

@@ -17,6 +17,9 @@ module Prose.Extension.Article where
 -- pandoc-type
 import Text.Pandoc.Builder qualified as P
 
+-- pandoc
+import Text.Pandoc qualified as PD
+
 -- parser-combinators
 import Control.Monad.Combinators
 
@@ -25,6 +28,7 @@ import Control.Lens hiding (Simple, para)
 
 -- base
 import Data.List.NonEmpty qualified as NE
+import Control.Monad
 
 -- text
 import Data.Text qualified as Text
@@ -50,6 +54,7 @@ data Article = Article
   , _articleAuthors :: [Author]
   , _articleAbstract :: [Sentences Simple]
   , _articleSections :: [Section']
+  , _articleReferences :: [Text.Text]
   }
   deriving (Eq, Show)
 
@@ -60,10 +65,17 @@ fromDoc :: AnnSection MPos -> Validation Fault Article
 fromDoc doc = do
   let sec = doc ^. unAnnSec
       _articleTitle = mapDoc toSimple (sec ^. sectionTitle)
-      _articleSections =
-        sec ^.. sectionSubs . folded . unAnnSec . to (mapDoc toSimple) . colSec
 
       content = sec ^. sectionContent
+
+  (_articleSections, _articleReferences) <- flip parseAll (sec ^.. sectionSubs . folded . unAnnSec . to (mapDoc toSimple) . colSec) do
+    manyTill_ pop (match (\(Section' Section {..}) -> do
+      guard ([word' "References"] `senIsPrefixOf` _sectionTitle)
+      flip parseAll _sectionContent do
+        match \(Block' (CodeBlock name code)) -> do
+          guard (name == Just "bibtex")
+          return code
+      ))
 
   flip parseAll content do
     _articleAuthors <- fmap concat . many $ dCompressedItems do
@@ -131,7 +143,11 @@ toDoc Article{..} =
             , Block' . para <$> _articleAbstract
             , []
             ]
-      , _sectionSubs = _articleSections
+      , _sectionSubs = _articleSections ++ [ Section' 
+          (Section (fromSentenceBuilder (sb [ word' "References"]))
+            [Block' (CodeBlock (Just "bibtex") _articleReferences)] 
+            [])
+          ]
       }
 
 toPandoc :: Article -> P.Pandoc
@@ -142,6 +158,14 @@ toPandoc Article{..} =
     . P.setMeta
       "abstract"
       (foldMap (overBlk simpleToPandoc . Block' . Para) _articleAbstract)
+    . P.setMeta
+      "references"
+      ( case PD.runPure (PD.readBibTeX PD.def (Text.unlines _articleReferences)) of
+          Left p -> error (show p)
+          Right (PD.Pandoc pd _) -> case PD.lookupMeta "references" pd of
+            Just ref -> ref
+            Nothing -> error $ "No references in: " ++ show pd
+      )
     . P.doc
     . foldMap (\s -> 
         overSec simpleToPandoc (overSec removeNotes s) 1

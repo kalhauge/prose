@@ -6,3 +6,16 @@
 This is the abstract.
 
 ## Introduction
+
+## References
+
+```bibtex
+@inproceedings{broy1997software,
+  title={Software and system modeling based on a unified formal semantics},
+  author={Broy, Manfred and Huber, Franz and Paech, Barbara and Rumpe, Bernhard and Spies, Katharina},
+  booktitle={International Workshop on Requirements Targeting Software and Systems Engineering},
+  pages={43--68},
+  year={1997},
+  organization={Springer}
+}
+```

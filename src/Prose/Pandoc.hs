@@ -82,7 +82,10 @@ toPandoc = DocMap $ Instance{..}
     Verbatim a -> (True, PD.code a)
     Emdash -> (True, PD.str "—")
     Number a -> (True, PD.str a)
-    Reference a -> (True, PD.str ("@" <> a))
+    Reference a ->
+      ( True
+      , PD.cite [ PD.Citation a [] [] PD.NormalCitation 0 0 ] mempty
+      )
     Word i -> (True, PD.str i)
     Qouted q -> (True, onQoute q)
 

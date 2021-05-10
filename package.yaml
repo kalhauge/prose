@@ -32,6 +32,7 @@ dependencies:
 - containers >= 0.6 && <= 0.7
 - optparse-applicative
 - pandoc-types >= 1.22
+- pandoc 
 - aeson
 - bytestring
 - lens >= 4.19 && < 5

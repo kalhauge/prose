@@ -33,7 +33,6 @@ import Text.Megaparsec
 -- aeson
 import Data.Aeson hiding (Success)
 
-import Prose.Doc
 import Prose.Pandoc
 import Prose.Recursion
 import Prose.Simple

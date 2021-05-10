@@ -17,6 +17,9 @@ import qualified Data.Sequence as Seq
 -- lens
 import Control.Lens hiding (Simple)
 
+-- pandoc
+import qualified Text.Pandoc as PD
+
 -- megaparsec
 import Text.Megaparsec (SourcePos)
 
@@ -42,8 +45,9 @@ data Fault
   = EndOfList
   | ItemsLeftInList
   | CouldNotMatch Text.Text
+  | APandocError PD.PandocError
   | FaultIn Text.Text MPos (Seq.Seq Fault)
-  deriving (Eq, Show)
+  deriving (Show)
 
 type DocParserInt b =
   ValidationT (State [b]) Fault
@@ -126,6 +130,9 @@ type ParseLens b a = Getting (FirstV a) b a
 -- inBlk fn (AnnBlock a b) = fn b <&> \case
 --   Success x -> Success x
 --   Failure err -> Failure (pure $ FaultIn "block" a err)
+
+dCodeBlock :: DocParser (Blk APos) (Sentences Simple)
+dCodeBlock = match (takeIt $ unAnnBlk .  _Para . to (mapDoc toSimple))
 
 dPara :: DocParser (Blk APos) (Sentences Simple)
 dPara = match (takeIt $ unAnnBlk .  _Para . to (mapDoc toSimple))
