@@ -17,6 +17,9 @@ import Prose.Simple
 import Prose.Annotated
 import Prose.Recursion
 import Prose.Extension.Article
+import Prose.Text.Parser
+
+import Prose.Internal.Validation
 
 -- prose-test
 import Prose.DocSpec
@@ -24,7 +27,23 @@ import SpecHelper
 
 spec :: Spec
 spec = do
-  return ()
+  it "should read article" do
+    Right i <- parseFile "test/data/canonical/article.prs" 
+
+    s <- case fromDoc i of
+      Success s -> return s
+      Failure e -> error (show e)
+
+    toDoc s `shouldBe` overSec toSimple i
+
+    -- let Success art = fromDoc i
+    --     Success art2 = fromDoc (overSec (fromSimple (initialPos "nofile")) (toDoc art)) 
+
+    --art `shouldBe` art2
+
+
+
+
 --   prop "should convert to Doc" do
 --     i <- forAll genArticle
 --     tripping i toDoc (\(an :: Section') ->

@@ -35,6 +35,7 @@ import Prelude hiding (id, (.))
 
 -- text
 import Data.Text qualified as Text
+import Data.Text.IO qualified as Text
 
 -- megaparsec
 import Text.Megaparsec hiding (label, sepBy1, sepEndBy1, some)
@@ -50,6 +51,14 @@ import Prose.Builder ()
 import Prose.Doc
 import Prose.Recursion
 import Prose.Simple
+
+parseFile :: FilePath -> IO (Either Text.Text (Sec (Ann SourcePos)))
+parseFile fp = parseText fp <$> Text.readFile fp 
+
+parseText :: FilePath -> Text.Text -> Either Text.Text (Sec (Ann SourcePos))
+parseText fp txt = case runParser (onSec parseAnnotatedR) fp txt of
+  Left e -> Left . Text.pack $ errorBundlePretty e
+  Right b -> Right b
 
 parseSimple :: DocCoAlgebra Parser Simple
 parseSimple = natCoAlgebra (`runReaderT` defaultParserConfig) alg

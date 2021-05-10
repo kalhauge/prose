@@ -148,7 +148,17 @@ showDoc = DocAlgebra{..}
           . showChar ' '
           . showListWith (`fromOrderedItem` n) (NE.toList its)
 
-  fromItem Item{} = const $ shows ()
+  fromItem Item{..} n = 
+    showParen (n > app_prec) $
+      showString "Item"
+      . showChar ' '
+      . showsPrec app_prec _itemType
+      . showChar ' '
+      . showsPrec app_prec _itemTodo
+      . showChar ' '
+      . fromSentences _itemTitle app_prec
+      . showChar ' '
+      . showListWith ($ 0) _itemContents
   -- fromSentences itemTitle
   -- <> fold itemContents
 

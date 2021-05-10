@@ -177,10 +177,6 @@ onCanonicalFiles k = do
   files <- runIO (glob "test/data/canonical/*.prs")
   forM_ files (`onFile` k)
 
-onFile :: FilePath -> (Text.Text -> SpecWith ()) -> SpecWith ()
-onFile file k = describe file do
-  k =<< runIO (Text.readFile file)
-
 parseOrFail :: Parser i -> Text.Text -> (i -> IO ()) -> IO ()
 parseOrFail p txt run = case parse p "p or f" txt of
   Left err -> expectationFailure (errorBundlePretty err)

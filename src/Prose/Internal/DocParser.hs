@@ -42,7 +42,7 @@ type ABlock = AnnBlock MPos
 type MPos = SourcePos
 
 data Fault
-  = EndOfList
+  = EndOfList Text.Text
   | ItemsLeftInList
   | CouldNotMatch Text.Text
   | APandocError PD.PandocError
@@ -70,11 +70,18 @@ parseAll (DocParser s) bs = case runState (runValidationT s) bs of
   (Failure err, _ : _) -> Failure err
   (_, _ : _) -> Failure (pure ItemsLeftInList)
 
-pop :: DocParser b b
-pop =
+pop :: Text.Text -> DocParser b b
+pop txt =
   validate =<< state \case
-    [] -> (Failure (pure EndOfList), [])
+    [] -> (Failure (pure (EndOfList txt)), [])
     a : rest -> (Success a, rest)
+
+try :: DocParser b a -> DocParser b a
+try ps = DocParser (ValidationT $ state (\s ->  
+  case runState (runValidationT (runDocParser ps)) s of
+    (Success a, s') -> (return a, s')
+    (Failure msg, _) -> (Failure msg, s)
+  ))
 
 ptail :: DocParser b [b]
 ptail = state (,[])
@@ -89,20 +96,32 @@ instance Semigroup (FirstV a) where
 instance Monoid (FirstV a) where
   mempty = FirstV (Failure mempty)
 
-match :: (b -> Validation Fault a) -> DocParser b a
-match getter = validate . getter =<< pop
+match :: Text.Text -> (b -> Validation Fault a) -> DocParser b a
+match txt getter = try (validate . getter =<< pop txt)
+
+matchSec :: (Section APos -> Validation Fault a) -> DocParser (Sec APos) a
+matchSec getter = try $ do
+  AnnSection _ sec <- pop "section"
+  validate $ getter sec
 
 submatch ::
   (b -> Seq.Seq Fault -> Seq.Seq Fault)
   -> (b -> Validation Fault [a]) 
   -> DocParser a c 
   -> DocParser b c
-submatch f getter pac = do
-  b <- pop
+submatch f getter pac = try $ do
+  b <- pop "submatch"
   as <- validate (getter b)
   case parseAll pac as of
     Success a -> return a
     Failure err -> validate $ Failure (f b err)
+
+submatchSec ::
+  (Sec APos -> Validation Fault [a]) 
+  -> DocParser a c 
+  -> DocParser (Sec APos) c
+submatchSec = do
+  submatch (\(AnnSection _ _) -> id)
 
 submatchBlk ::
   (Blk APos -> Validation Fault [a]) 
@@ -122,7 +141,7 @@ takeIt l b = case b ^? l of
   Nothing -> Failure mempty
 
 matchL :: Getting (Data.Monoid.First a) b a -> DocParser b a
-matchL l = match (takeIt l)
+matchL l = match "takeit" (takeIt l)
 
 type ParseLens b a = Getting (FirstV a) b a
 
@@ -131,11 +150,11 @@ type ParseLens b a = Getting (FirstV a) b a
 --   Success x -> Success x
 --   Failure err -> Failure (pure $ FaultIn "block" a err)
 
-dCodeBlock :: DocParser (Blk APos) (Sentences Simple)
-dCodeBlock = match (takeIt $ unAnnBlk .  _Para . to (mapDoc toSimple))
+dCodeBlock :: DocParser (Blk APos) (Maybe Text.Text, [Text.Text])
+dCodeBlock = match "code-block" (takeIt $ unAnnBlk . _CodeBlock)
 
 dPara :: DocParser (Blk APos) (Sentences Simple)
-dPara = match (takeIt $ unAnnBlk .  _Para . to (mapDoc toSimple))
+dPara = match "para" (takeIt $ unAnnBlk .  _Para . to (mapDoc toSimple))
 
 dItems ::
   DocParser (Item APos) a ->

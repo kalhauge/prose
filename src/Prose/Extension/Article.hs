@@ -42,9 +42,10 @@ import Prose.Pandoc
 import Prose.Recursion
 import Prose.Simple
 import Prose.Text.Serializer (serializeSimple)
+import Data.Foldable (fold)
 
 data Author = Author
-  { _authorName :: Text.Text
+  { _authorName :: Sentences Simple
   , _authorAffiliation :: Maybe Text.Text
   }
   deriving (Eq, Show)
@@ -68,14 +69,22 @@ fromDoc doc = do
 
       content = sec ^. sectionContent
 
-  (_articleSections, _articleReferences) <- flip parseAll (sec ^.. sectionSubs . folded . unAnnSec . to (mapDoc toSimple) . colSec) do
-    manyTill_ pop (match (\(Section' Section {..}) -> do
-      guard ([word' "References"] `senIsPrefixOf` _sectionTitle)
+  (_articleSections, _articleReferences) <- flip parseAll (sec ^. sectionSubs) do
+    secs <- many $ matchSec \s@Section {..} -> do
+      guard $ not ([word' "References"] `senIsPrefixOf` mapDoc toSimple _sectionTitle)
+      return (Section' $ mapDoc toSimple s)
+
+    refs <- optional $ matchSec \Section {..} -> do
+      guard ([word' "References"] `senIsPrefixOf` mapDoc toSimple _sectionTitle)
       flip parseAll _sectionContent do
-        match \(Block' (CodeBlock name code)) -> do
-          guard (name == Just "bibtex")
-          return code
-      ))
+        (_, code) <- dCodeBlock
+        -- guard (name == Just "bibtex")
+        return code
+
+    return (secs, fold refs)
+
+    -- manyTill_ (pop "any-section") (match "section" (\(Section' Section {..}) -> do
+    --   guard ([word' "References"] `senIsPrefixOf` _sectionTitle)
 
   flip parseAll content do
     _articleAuthors <- fmap concat . many $ dCompressedItems do
@@ -86,10 +95,9 @@ fromDoc doc = do
         _ ->
           Failure (pure $ CouldNotMatch "by:")
         ) do
-        many (match (\case 
+        many (match "item-tree" (\case 
           ItemTree _ _ n [] ->
-            Success (Author 
-              (fromSentences serializeSimple . mapDoc toSimple $ n) 
+            Success (Author (mapDoc toSimple n)
               Nothing)
           _ -> Failure (pure $ CouldNotMatch "subitems in author")
           ))
@@ -133,7 +141,7 @@ toDoc Article{..} =
                       [ item'
                           (sb [word' "by", colon'])
                           [ items'
-                              [ item' (sb [word' n]) []
+                              [ Item Minus Nothing n []
                               | Author n _ <- _articleAuthors
                               ]
                           ]
@@ -171,10 +179,11 @@ toPandoc Article{..} =
         overSec simpleToPandoc (overSec removeNotes s) 1
     )
     . filter noteFilter
-    $ _articleSections
+    $ _articleSections 
+      ++ [Section' $ Section (fromSentenceBuilder (sb [ word' "References"])) [] []]
  where
   authorToPandoc Author{..} =
-    P.text _authorName
+    P.text (fromSentences serializeSimple _authorName)
 
   noteFilter :: Section' -> Bool
   noteFilter (Section' s') = 
