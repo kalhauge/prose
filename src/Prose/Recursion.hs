@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-
 module Prose.Recursion where
 
 -- base
@@ -66,6 +65,9 @@ instance DocR (e ~:> e') where
 
 overSec :: e ~:> e' -> Sec e -> Sec e'
 overSec = onSec . docMapper
+
+setSec :: (Sec a -> Sec a') -> a ~:> a' ->  a ~:> a'
+setSec sMap (DocMap i) = DocMap $ i {onSec = sMap }
 
 overBlk :: e ~:> e' -> Blk e -> Blk e'
 overBlk = onBlk . docMapper
@@ -199,6 +201,19 @@ hylo project embed = extract
         , onClosedSen = overClosedSen embed . mapDocSen extract . overClosedSen project
         }
 
+hylo' ::
+  ProjectableR a =>
+  EmbedableR b =>
+  a ~:> b
+hylo' = hylo projectR embedR
+
+hyloId ::
+  ProjectableR a =>
+  EmbedableR a =>
+  Unfix a ~:> Unfix a
+  -> a ~:> a
+hyloId fn = hylo (fn . projectR) embedR
+
 class DocR e => ProjectableR e where
   projectR :: e ~:> Unfix e
 
@@ -235,6 +250,10 @@ ana ::
   a ~:> Unfix a ->
   a ~:> e
 ana = flip hylo embedR
+
+idR :: a ~:> a
+idR = DocMap $ Instance id id id id id
+
 
 hyloM ::
   Monad m =>
@@ -745,3 +764,12 @@ unziplist a (ls, ts) = foldr (:) ts (a : ls)
 
 unzipnelist :: a -> ListZipper a -> NE.NonEmpty a
 unzipnelist a (ls, ts) = foldr (NE.<|) (a NE.:| ts) ls
+
+-- | Checks if the first sentence in a list of sentences starts with a list of words.
+senIsPrefixOf :: forall e. (Eq (Inl e), ProjectableR e) => [Inl e] -> Sentences e -> Bool
+senIsPrefixOf inl = \case
+  OpenSentences a -> case overOpenSen @e projectR a of
+    OpenSentence ne -> inl `NE.isPrefixOf` ne
+  ClosedSentences a more -> case overClosedSen @e projectR a of
+    ClosedSentence ne _ -> inl `NE.isPrefixOf` ne
+

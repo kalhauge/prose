@@ -11,6 +11,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
+{-# LANGUAGE TypeOperators #-}
 module Prose.Extension.Article where
 
 -- pandoc-type
@@ -142,7 +143,25 @@ toPandoc Article{..} =
       "abstract"
       (foldMap (overBlk simpleToPandoc . Block' . Para) _articleAbstract)
     . P.doc
-    $ foldMap (\s -> overSec simpleToPandoc s 1) _articleSections
+    . foldMap (\s -> 
+        overSec simpleToPandoc (overSec removeNotes s) 1
+    )
+    . filter noteFilter
+    $ _articleSections
  where
   authorToPandoc Author{..} =
     P.text _authorName
+
+  noteFilter :: Section' -> Bool
+  noteFilter (Section' s') = 
+     not ([ word' "Notes", colon' ] `senIsPrefixOf` _sectionTitle s')
+
+  removeNotes :: Simple ~:> Simple
+  removeNotes = hyloId 
+    ( setSec 
+        (\s -> s { _sectionSubs = filter noteFilter (_sectionSubs s) }) 
+        idR
+    )
+
+
+

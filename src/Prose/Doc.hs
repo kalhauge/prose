@@ -132,6 +132,7 @@ data Sentences e
   = OpenSentences (OpenSen e)
   | ClosedSentences (ClosedSen e) (Maybe (Sentences e))
 
+
 deriving instance EqR e => Eq (Sentences e)
 deriving instance OrdR e => Ord (Sentences e)
 
